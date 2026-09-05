@@ -47,23 +47,23 @@ jobs:
       - name: Build Android Debug APK
         run: |
           cd android
-          ./gradlew assembleDebug --stacktrace --no-daemon 2>&1 | tee build.log
-          echo "=== Found APKs: ==="
-          find . -name "*.apk"
-
-      - name: Upload Gradle Build Log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: Android-Gradle-Build-Log
-          path: android/build.log
-          retention-days: 7
+          ./gradlew :app:assembleDebug --stacktrace --no-daemon
+          mkdir -p ../dist-apk
+          APK_FOUND=$(find . -name "*.apk" -type f | head -n 1)
+          echo "=== Found APK: $APK_FOUND ==="
+          if [ -n "$APK_FOUND" ]; then
+            cp -v "$APK_FOUND" ../dist-apk/PandaSportsAcademy-debug.apk
+          else
+            echo "::error::No APK file found after assembleDebug!"
+            exit 1
+          fi
 
       - name: Upload Android APK
         uses: actions/upload-artifact@v4
         with:
           name: Panda-Sports-Academy-Android-APK
-          path: android/app/build/outputs/apk/**/*.apk
+          path: dist-apk/PandaSportsAcademy-debug.apk
+          if-no-files-found: error
           retention-days: 30
 
   build-ios:

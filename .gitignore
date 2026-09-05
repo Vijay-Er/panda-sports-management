@@ -1,0 +1,19 @@
+node_modules
+dist
+dist-ssr
+*.local
+*.zip
+.vscode
+.idea
+.DS_Store
+
+# Android build outputs
+android/app/build/
+android/.gradle/
+android/build/
+
+# iOS build outputs
+ios/App/Pods/
+ios/App/build/
+DerivedData/
+

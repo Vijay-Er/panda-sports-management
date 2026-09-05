@@ -48,6 +48,8 @@ jobs:
         run: |
           cd android
           ./gradlew assembleDebug --stacktrace --no-daemon 2>&1 | tee build.log
+          echo "=== Found APKs: ==="
+          find . -name "*.apk"
 
       - name: Upload Gradle Build Log
         if: always()
@@ -61,7 +63,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Panda-Sports-Academy-Android-APK
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          path: android/app/build/outputs/apk/**/*.apk
           retention-days: 30
 
   build-ios:

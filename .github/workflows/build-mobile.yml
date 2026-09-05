@@ -47,11 +47,17 @@ jobs:
       - name: Build Android Debug APK
         run: |
           cd android
-          ./gradlew assembleDebug --stacktrace --no-daemon
-          echo "=== All build files in app/build: ==="
-          find app/build -type f || true
-          echo "=== All APK files found: ==="
-          find . -name "*.apk" || true
+          ./gradlew assembleDebug --stacktrace --no-daemon > gradle.log 2>&1 || {
+            echo "### ❌ Gradle Build Failed" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            tail -n 80 gradle.log >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            cat gradle.log
+            exit 1
+          }
+          echo "### ✅ Gradle Build Succeeded!" >> $GITHUB_STEP_SUMMARY
+          echo "=== Found APK files: ==="
+          find . -name "*.apk"
           mkdir -p ../dist-apk
           find . -name "*.apk" -exec cp -v {} ../dist-apk/ \; || true
 

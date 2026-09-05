@@ -7,6 +7,10 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
+env:
+  CAPACITOR_TELEMETRY: "0"
+  CI: "true"
+
 jobs:
   build-ios:
     name: Build iOS IPA & Project
@@ -28,7 +32,7 @@ jobs:
         run: npm run build
 
       - name: Sync Capacitor iOS
-        run: npx cap sync ios
+        run: npm run cap sync ios
 
       - name: Build iOS App (.app)
         run: |
@@ -48,10 +52,16 @@ jobs:
           cd ios/App
           APP_PATH=$(find build/Build/Products/Release-iphoneos -name "*.app" | head -n 1)
           echo "Found app at: $APP_PATH"
-          mkdir -p Payload
-          cp -r "$APP_PATH" Payload/
-          zip -r PandaSportsAcademy.ipa Payload
-          echo "IPA successfully created!"
+          if [ -n "$APP_PATH" ]; then
+            mkdir -p Payload
+            cp -r "$APP_PATH" Payload/
+            zip -r PandaSportsAcademy.ipa Payload
+            echo "IPA successfully created!"
+          else
+            echo "Release-iphoneos app not found, searching build folder..."
+            find build -name "*.app"
+            exit 1
+          fi
 
       - name: Upload iOS IPA File
         uses: actions/upload-artifact@v4
@@ -87,7 +97,7 @@ jobs:
         run: npm run build
 
       - name: Sync Capacitor Android
-        run: npx cap sync android
+        run: npm run cap sync android
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4

@@ -659,7 +659,9 @@ export default function App() {
       const newCustomer = {
         ...customerData,
         id: Date.now(),
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        joiningDate: new Date().toISOString(),
+        isActive: true
       };
       setCustomers(prev => [newCustomer, ...prev]);
       showToast(`Added "${customerData.name}" to Customer Directory!`);
@@ -1109,7 +1111,7 @@ export default function App() {
           setIsCustomerModalOpen(false);
           setCustomerToEdit(null);
         }}
-        customer={customerToEdit}
+        initialCustomer={customerToEdit}
         onSaveCustomer={handleSaveCustomer}
       />
 
@@ -1147,8 +1149,7 @@ export default function App() {
         <CustomerProfileModal
           isOpen={!!selectedCustomerForCRM}
           onClose={() => setSelectedCustomerForCRM(null)}
-          customerPhone={selectedCustomerForCRM.phone}
-          customerName={selectedCustomerForCRM.name}
+          customer={selectedCustomerForCRM}
           bookings={bookings}
           onBookForPlayer={() => {
             const cust = selectedCustomerForCRM;

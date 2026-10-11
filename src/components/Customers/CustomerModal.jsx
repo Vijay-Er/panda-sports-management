@@ -1,84 +1,74 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  X, User, Phone as PhoneIcon, FileText, CheckCircle2, 
-  MapPin, Heart, Briefcase, Calendar, Shield, Clock, 
-  Star, Users, ChevronRight 
+  X, User, Phone, MapPin, Briefcase, Star, 
+  ChevronDown, ChevronUp, CheckCircle2, Clock, Sparkles
 } from 'lucide-react';
 import { 
-  GENDER_OPTIONS, BLOOD_GROUP_OPTIONS, PREFERRED_TIME_OPTIONS, 
-  PREFERRED_SERVICE_OPTIONS, PREFERRED_SPORTS_OPTIONS, 
-  SKILL_LEVEL_OPTIONS, PLAY_FREQUENCY_OPTIONS, DAYS_OF_WEEK, 
-  INTEREST_OPTIONS, REFERRAL_SOURCE_OPTIONS, MEMBERSHIP_TYPE_OPTIONS 
+  SKILL_LEVEL_OPTIONS, 
+  MEMBERSHIP_TYPE_OPTIONS 
 } from '../../constants/customers';
 
-export default function CustomerModal({ isOpen, onClose, onSaveCustomer, initialCustomer = null }) {
+export default function CustomerModal({ 
+  isOpen, 
+  onClose, 
+  onSaveCustomer, 
+  initialCustomer = null 
+}) {
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
+    area: '',
+    preferredTime: 'Evening',
+    preferredService: 'Both',
+    occupation: '',
+    interests: [],
+    // Optional / Extra fields
     email: '',
     dateOfBirth: '',
-    gender: '',
-    bloodGroup: '',
-    area: '',
-    address: '',
-    pincode: '',
-    emergencyContactName: '',
-    emergencyContactPhone: '',
-    preferredTime: '',
-    preferredService: '',
-    preferredSports: [],
-    preferredCourt: '',
-    skillLevel: '',
-    playFrequency: '',
-    preferredDays: [],
-    occupation: '',
-    company: '',
-    interests: [],
-    referredBy: '',
-    membershipType: '',
+    skillLevel: 'Intermediate',
+    membershipType: 'Regular',
     notes: ''
   });
 
-  const [activeTab, setActiveTab] = useState(0);
+  const [showMoreDetails, setShowMoreDetails] = useState(false);
 
   useEffect(() => {
     if (initialCustomer) {
       setFormData({
         name: initialCustomer.name || '',
-        phone: initialCustomer.phone || '',
+        phone: (initialCustomer.phone || '').replace(/\D/g, '').slice(-10),
+        area: initialCustomer.area || '',
+        preferredTime: initialCustomer.preferredTime || 'Evening',
+        preferredService: initialCustomer.preferredService || 'Both',
+        occupation: initialCustomer.occupation || '',
+        interests: initialCustomer.interests || [],
         email: initialCustomer.email || '',
         dateOfBirth: initialCustomer.dateOfBirth || '',
-        gender: initialCustomer.gender || '',
-        bloodGroup: initialCustomer.bloodGroup || '',
-        area: initialCustomer.area || '',
-        address: initialCustomer.address || '',
-        pincode: initialCustomer.pincode || '',
-        emergencyContactName: initialCustomer.emergencyContactName || '',
-        emergencyContactPhone: initialCustomer.emergencyContactPhone || '',
-        preferredTime: initialCustomer.preferredTime || '',
-        preferredService: initialCustomer.preferredService || '',
-        preferredSports: initialCustomer.preferredSports || [],
-        preferredCourt: initialCustomer.preferredCourt || '',
-        skillLevel: initialCustomer.skillLevel || '',
-        playFrequency: initialCustomer.playFrequency || '',
-        preferredDays: initialCustomer.preferredDays || [],
-        occupation: initialCustomer.occupation || '',
-        company: initialCustomer.company || '',
-        interests: initialCustomer.interests || [],
-        referredBy: initialCustomer.referredBy || '',
-        membershipType: initialCustomer.membershipType || '',
+        skillLevel: initialCustomer.skillLevel || 'Intermediate',
+        membershipType: initialCustomer.membershipType || 'Regular',
         notes: initialCustomer.notes || ''
       });
+      // If customer has extra details, auto-expand the section
+      if (initialCustomer.email || initialCustomer.dateOfBirth || initialCustomer.notes) {
+        setShowMoreDetails(true);
+      }
     } else {
       setFormData({
-        name: '', phone: '', email: '', dateOfBirth: '', gender: '', bloodGroup: '',
-        area: '', address: '', pincode: '', emergencyContactName: '', emergencyContactPhone: '',
-        preferredTime: '', preferredService: '', preferredSports: [], preferredCourt: '',
-        skillLevel: '', playFrequency: '', preferredDays: [], occupation: '', company: '',
-        interests: [], referredBy: '', membershipType: '', notes: ''
+        name: '',
+        phone: '',
+        area: '',
+        preferredTime: 'Evening',
+        preferredService: 'Both',
+        occupation: '',
+        interests: [],
+        email: '',
+        dateOfBirth: '',
+        skillLevel: 'Intermediate',
+        membershipType: 'Regular',
+        notes: ''
       });
+      setShowMoreDetails(false);
     }
-    setActiveTab(0);
   }, [initialCustomer, isOpen]);
 
   if (!isOpen) return null;
@@ -88,169 +78,286 @@ export default function CustomerModal({ isOpen, onClose, onSaveCustomer, initial
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const toggleChip = (field, value) => {
+  const handlePhoneChange = (e) => {
+    const clean = e.target.value.replace(/\D/g, '').slice(0, 10);
+    setFormData(prev => ({ ...prev, phone: clean }));
+  };
+
+  const toggleInterest = (interest) => {
     setFormData(prev => {
-      const current = prev[field] || [];
-      if (current.includes(value)) {
-        return { ...prev, [field]: current.filter(item => item !== value) };
-      } else {
-        return { ...prev, [field]: [...current, value] };
-      }
+      const exists = prev.interests.includes(interest);
+      return {
+        ...prev,
+        interests: exists 
+          ? prev.interests.filter(i => i !== interest)
+          : [...prev.interests, interest]
+      };
     });
   };
 
-  const renderChips = (field, options) => (
-    <div className="flex flex-wrap gap-2">
-      {options.map(option => {
-        const isSelected = (formData[field] || []).includes(option);
-        return (
-          <div
-            key={option}
-            onClick={() => toggleChip(field, option)}
-            className={`border rounded-lg px-2.5 py-1 text-[11px] font-bold cursor-pointer transition-all ${
-              isSelected
-                ? 'bg-[#d33638] text-white border-[#d33638]'
-                : 'bg-zinc-100 text-zinc-600 border-zinc-200 hover:bg-zinc-200'
-            }`}
-          >
-            {option}
-          </div>
-        );
-      })}
-    </div>
-  );
-
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!formData.name || !formData.phone) {
-      alert("Name and Phone are required.");
+    if (!formData.name.trim()) {
+      alert("Please enter customer name.");
       return;
     }
-    if (formData.phone.length !== 10) {
-      alert("Phone number must be exactly 10 digits.");
+    if (!formData.phone.trim() || formData.phone.length !== 10) {
+      alert("Please enter a valid 10-digit mobile number.");
       return;
     }
 
-    const customerData = {
+    const payload = {
+      ...(initialCustomer || {}),
       ...formData,
-      id: initialCustomer?.id || 'cust-' + formData.phone,
+      name: formData.name.trim(),
+      phone: formData.phone.trim(),
+      id: initialCustomer?.id || `cust-${formData.phone.trim()}`,
       createdAt: initialCustomer?.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      isActive: initialCustomer?.isActive !== undefined ? initialCustomer.isActive : true
     };
 
-    onSaveCustomer(customerData);
+    onSaveCustomer(payload);
     onClose();
   };
 
-  const tabs = [
-    { id: 0, label: 'Personal', icon: User },
-    { id: 1, label: 'Location', icon: MapPin },
-    { id: 2, label: 'Preferences', icon: Star },
-    { id: 3, label: 'Background', icon: Briefcase },
+  const commonInterests = [
+    'Fitness',
+    'Weekend Matches',
+    'Tournaments',
+    'Social Play',
+    'Coaching / Training'
   ];
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
+      <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-zinc-100 shrink-0">
-          <div>
-            <h2 className="text-xl font-extrabold text-zinc-900">
-              {initialCustomer ? 'Edit Customer' : 'Add New Customer'}
-            </h2>
-            <p className="text-xs font-bold text-zinc-500 mt-1">
-              {initialCustomer ? 'Update customer details' : 'Enter details for the new customer'}
-            </p>
+        <div className="px-6 py-4 border-b border-zinc-100 flex justify-between items-center bg-zinc-50/80 shrink-0">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-red-50 text-[#d33638] flex items-center justify-center font-bold">
+              <User size={18} />
+            </div>
+            <div>
+              <h3 className="font-black text-base text-zinc-900 leading-tight">
+                {initialCustomer ? 'Edit Customer' : 'Add New Customer'}
+              </h3>
+              <p className="text-[11px] text-zinc-500 font-medium">
+                Quick 30-second player registration
+              </p>
+            </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-zinc-100 rounded-full transition-colors text-zinc-500 hover:text-zinc-900"
+          <button 
+            type="button"
+            onClick={onClose} 
+            className="w-8 h-8 rounded-full hover:bg-zinc-200 text-zinc-400 hover:text-zinc-700 flex items-center justify-center transition-colors"
           >
-            <X size={20} />
+            <X size={18} />
           </button>
         </div>
 
-        {/* Tabs */}
-        <div className="px-6 pt-4 shrink-0">
-          <div className="flex space-x-1 bg-zinc-100 p-1 rounded-2xl overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              const isActive = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex-1 justify-center ${
-                    isActive
-                      ? 'bg-white shadow-sm text-zinc-900'
-                      : 'text-zinc-500 hover:text-zinc-700'
-                  }`}
-                >
-                  <Icon size={14} />
-                  <span>{tab.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
         {/* Scrollable Form Body */}
-        <div className="flex-1 overflow-y-auto p-6">
-          <form id="customer-form" onSubmit={handleSubmit} className="space-y-6">
-            {/* TAB 0: Personal */}
-            {activeTab === 0 && (
-              <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1">
-                    Name*
-                  </label>
+        <form onSubmit={handleSubmit} className="overflow-y-auto p-6 space-y-5">
+          {/* 1. Essential Info */}
+          <div className="space-y-3">
+            <div>
+              <label className="block text-[11px] font-extrabold uppercase tracking-wider text-zinc-700 mb-1">
+                Player / Customer Name <span className="text-[#d33638]">*</span>
+              </label>
+              <input
+                required
+                autoFocus
+                type="text"
+                name="name"
+                placeholder="e.g. Rahul Sharma"
+                value={formData.name}
+                onChange={handleChange}
+                className="w-full bg-zinc-50 border border-zinc-200 focus:border-[#d33638] focus:bg-white rounded-xl px-3.5 py-2.5 text-sm font-bold text-zinc-900 outline-none transition-all placeholder:text-zinc-400"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[11px] font-extrabold uppercase tracking-wider text-zinc-700 mb-1">
+                  WhatsApp Number <span className="text-[#d33638]">*</span>
+                </label>
+                <div className="relative flex items-center">
+                  <span className="absolute left-3 text-xs font-black text-zinc-400">+91</span>
+                  <input
+                    required
+                    type="tel"
+                    placeholder="98765 43210"
+                    maxLength={10}
+                    value={formData.phone}
+                    onChange={handlePhoneChange}
+                    className="w-full bg-zinc-50 border border-zinc-200 focus:border-[#d33638] focus:bg-white rounded-xl pl-11 pr-3 py-2.5 text-sm font-bold text-zinc-900 outline-none transition-all tracking-wide placeholder:text-zinc-400"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-extrabold uppercase tracking-wider text-zinc-700 mb-1">
+                  Area / Locality
+                </label>
+                <div className="relative flex items-center">
+                  <MapPin size={15} className="absolute left-3 text-zinc-400 pointer-events-none" />
                   <input
                     type="text"
-                    name="name"
-                    value={formData.name}
+                    name="area"
+                    placeholder="e.g. Anna Nagar, T. Nagar"
+                    value={formData.area}
                     onChange={handleChange}
-                    autoFocus
-                    required
-                    placeholder="Enter full name"
-                    className="w-full bg-zinc-50 border border-zinc-300 rounded-xl px-3 py-2.5 text-xs font-bold text-zinc-900 outline-none focus:border-[#d33638]"
+                    className="w-full bg-zinc-50 border border-zinc-200 focus:border-[#d33638] focus:bg-white rounded-xl pl-9 pr-3 py-2.5 text-sm font-semibold text-zinc-900 outline-none transition-all placeholder:text-zinc-400"
                   />
                 </div>
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1">
-                    WhatsApp Number*
-                  </label>
-                  <div className="flex relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 font-bold text-xs pointer-events-none">
-                      +91
-                    </span>
+              </div>
+            </div>
+          </div>
+
+          {/* 2. Quick Timing Preference */}
+          <div className="pt-2 border-t border-zinc-100">
+            <label className="block text-[11px] font-extrabold uppercase tracking-wider text-zinc-700 mb-2">
+              Preferred Playing Time
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { id: 'Morning', label: '🌅 Morning', sub: '6 AM - 12 PM' },
+                { id: 'Evening', label: '🌆 Evening', sub: '4 PM - 11 PM' },
+                { id: 'Both', label: '🔄 Flexible / Both', sub: 'Anytime' }
+              ].map(opt => {
+                const isSelected = formData.preferredTime === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setFormData(prev => ({ ...prev, preferredTime: opt.id }))}
+                    className={`py-2 px-2.5 rounded-xl border text-center transition-all ${
+                      isSelected 
+                        ? 'bg-red-50 border-[#d33638] text-[#d33638] shadow-sm ring-1 ring-[#d33638]' 
+                        : 'bg-zinc-50 border-zinc-200 text-zinc-700 hover:bg-zinc-100'
+                    }`}
+                  >
+                    <div className="text-xs font-black">{opt.label}</div>
+                    <div className={`text-[10px] font-medium mt-0.5 ${isSelected ? 'text-red-700' : 'text-zinc-400'}`}>
+                      {opt.sub}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 3. Booking / Play Type Preference */}
+          <div className="pt-2 border-t border-zinc-100">
+            <label className="block text-[11px] font-extrabold uppercase tracking-wider text-zinc-700 mb-2">
+              Play Style Preference
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { id: 'Court Booking', label: '🏸 Court Booking', desc: 'Private slots' },
+                { id: 'Group Game', label: '👥 Group Game', desc: 'Social / matches' },
+                { id: 'Both', label: '⚡ Both', desc: 'All formats' }
+              ].map(opt => {
+                const isSelected = formData.preferredService === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setFormData(prev => ({ ...prev, preferredService: opt.id }))}
+                    className={`py-2 px-2 rounded-xl border text-center transition-all ${
+                      isSelected 
+                        ? 'bg-zinc-900 border-zinc-900 text-white shadow-sm' 
+                        : 'bg-zinc-50 border-zinc-200 text-zinc-700 hover:bg-zinc-100'
+                    }`}
+                  >
+                    <div className="text-xs font-black">{opt.label}</div>
+                    <div className={`text-[10px] font-medium mt-0.5 ${isSelected ? 'text-zinc-300' : 'text-zinc-400'}`}>
+                      {opt.desc}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 4. Occupation & Interests */}
+          <div className="pt-2 border-t border-zinc-100 space-y-3">
+            <div>
+              <label className="block text-[11px] font-extrabold uppercase tracking-wider text-zinc-700 mb-1">
+                Occupation / Profession
+              </label>
+              <div className="relative flex items-center">
+                <Briefcase size={15} className="absolute left-3 text-zinc-400 pointer-events-none" />
+                <input
+                  type="text"
+                  name="occupation"
+                  placeholder="e.g. Software Engineer, Doctor, Student, Business"
+                  value={formData.occupation}
+                  onChange={handleChange}
+                  className="w-full bg-zinc-50 border border-zinc-200 focus:border-[#d33638] focus:bg-white rounded-xl pl-9 pr-3 py-2.5 text-xs font-semibold text-zinc-900 outline-none transition-all placeholder:text-zinc-400"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-extrabold uppercase tracking-wider text-zinc-700 mb-1.5">
+                Player Interests
+              </label>
+              <div className="flex flex-wrap gap-1.5">
+                {commonInterests.map(interest => {
+                  const isSelected = formData.interests.includes(interest);
+                  return (
+                    <button
+                      key={interest}
+                      type="button"
+                      onClick={() => toggleInterest(interest)}
+                      className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition-all ${
+                        isSelected
+                          ? 'bg-[#d33638] text-white border-[#d33638] shadow-sm'
+                          : 'bg-zinc-50 text-zinc-600 border-zinc-200 hover:bg-zinc-100'
+                      }`}
+                    >
+                      {interest}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* 5. Optional Collapsible Extra Details */}
+          <div className="pt-2 border-t border-zinc-100">
+            <button
+              type="button"
+              onClick={() => setShowMoreDetails(!showMoreDetails)}
+              className="w-full py-2 flex items-center justify-between text-xs font-bold text-zinc-500 hover:text-zinc-900 transition-colors"
+            >
+              <span className="flex items-center gap-1.5">
+                <Sparkles size={14} className="text-amber-500" />
+                <span>{showMoreDetails ? 'Hide Extra Details' : '+ Add More Optional Details (Email, DOB, Skill, Notes)'}</span>
+              </span>
+              {showMoreDetails ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            </button>
+
+            {showMoreDetails && (
+              <div className="mt-3 p-4 bg-zinc-50/70 border border-zinc-200 rounded-2xl space-y-3 animate-in fade-in duration-150">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-extrabold uppercase tracking-wider text-zinc-500 mb-1">
+                      Email Address
+                    </label>
                     <input
-                      type="tel"
-                      name="phone"
-                      value={formData.phone}
+                      type="email"
+                      name="email"
+                      placeholder="player@example.com"
+                      value={formData.email}
                       onChange={handleChange}
-                      required
-                      maxLength={10}
-                      placeholder="9876543210"
-                      className="w-full bg-zinc-50 border border-zinc-300 rounded-xl pl-10 pr-3 py-2.5 text-xs font-bold text-zinc-900 outline-none focus:border-[#d33638]"
+                      className="w-full bg-white border border-zinc-200 rounded-xl px-3 py-2 text-xs font-medium text-zinc-900 outline-none focus:border-[#d33638]"
                     />
                   </div>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1">
-                    Email
-                  </label>
-                  <input
-                    type="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    placeholder="email@example.com"
-                    className="w-full bg-zinc-50 border border-zinc-300 rounded-xl px-3 py-2.5 text-xs font-bold text-zinc-900 outline-none focus:border-[#d33638]"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
+
                   <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1">
+                    <label className="block text-[10px] font-extrabold uppercase tracking-wider text-zinc-500 mb-1">
                       Date of Birth
                     </label>
                     <input
@@ -258,328 +365,73 @@ export default function CustomerModal({ isOpen, onClose, onSaveCustomer, initial
                       name="dateOfBirth"
                       value={formData.dateOfBirth}
                       onChange={handleChange}
-                      className="w-full bg-zinc-50 border border-zinc-300 rounded-xl px-3 py-2.5 text-xs font-bold text-zinc-900 outline-none focus:border-[#d33638]"
+                      className="w-full bg-white border border-zinc-200 rounded-xl px-3 py-2 text-xs font-medium text-zinc-900 outline-none focus:border-[#d33638]"
                     />
                   </div>
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1">
-                      Blood Group
-                    </label>
-                    <select
-                      name="bloodGroup"
-                      value={formData.bloodGroup}
-                      onChange={handleChange}
-                      className="w-full bg-zinc-50 border border-zinc-300 rounded-xl px-3 py-2.5 text-xs font-bold text-zinc-900 outline-none focus:border-[#d33638]"
-                    >
-                      <option value="">Select...</option>
-                      {BLOOD_GROUP_OPTIONS.map(opt => (
-                        <option key={opt} value={opt}>{opt}</option>
-                      ))}
-                    </select>
-                  </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1">
-                    Gender
-                  </label>
-                  <select
-                    name="gender"
-                    value={formData.gender}
-                    onChange={handleChange}
-                    className="w-full bg-zinc-50 border border-zinc-300 rounded-xl px-3 py-2.5 text-xs font-bold text-zinc-900 outline-none focus:border-[#d33638]"
-                  >
-                    <option value="">Select...</option>
-                    {GENDER_OPTIONS.map(opt => (
-                      <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            )}
 
-            {/* TAB 1: Location */}
-            {activeTab === 1 && (
-              <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1">
-                    Area / Locality
-                  </label>
-                  <input
-                    type="text"
-                    name="area"
-                    value={formData.area}
-                    onChange={handleChange}
-                    placeholder="e.g. Anna Nagar, T. Nagar"
-                    className="w-full bg-zinc-50 border border-zinc-300 rounded-xl px-3 py-2.5 text-xs font-bold text-zinc-900 outline-none focus:border-[#d33638]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1">
-                    Full Address
-                  </label>
-                  <textarea
-                    name="address"
-                    value={formData.address}
-                    onChange={handleChange}
-                    rows="2"
-                    placeholder="Enter full address"
-                    className="w-full bg-zinc-50 border border-zinc-300 rounded-xl px-3 py-2.5 text-xs font-bold text-zinc-900 outline-none focus:border-[#d33638] resize-none"
-                  ></textarea>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1">
-                    PIN Code
-                  </label>
-                  <input
-                    type="text"
-                    name="pincode"
-                    value={formData.pincode}
-                    onChange={handleChange}
-                    maxLength={6}
-                    placeholder="600001"
-                    className="w-full bg-zinc-50 border border-zinc-300 rounded-xl px-3 py-2.5 text-xs font-bold text-zinc-900 outline-none focus:border-[#d33638]"
-                  />
-                </div>
-                <div className="pt-4 border-t border-zinc-100 space-y-4">
-                  <h3 className="text-sm font-extrabold text-zinc-900 flex items-center gap-2">
-                    <Heart size={16} className="text-red-500" />
-                    Emergency Contact
-                  </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1">
-                      Contact Name
-                    </label>
-                    <input
-                      type="text"
-                      name="emergencyContactName"
-                      value={formData.emergencyContactName}
-                      onChange={handleChange}
-                      placeholder="Name"
-                      className="w-full bg-zinc-50 border border-zinc-300 rounded-xl px-3 py-2.5 text-xs font-bold text-zinc-900 outline-none focus:border-[#d33638]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1">
-                      Contact Phone
-                    </label>
-                    <div className="flex relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 font-bold text-xs pointer-events-none">
-                        +91
-                      </span>
-                      <input
-                        type="tel"
-                        name="emergencyContactPhone"
-                        value={formData.emergencyContactPhone}
-                        onChange={handleChange}
-                        maxLength={10}
-                        placeholder="9876543210"
-                        className="w-full bg-zinc-50 border border-zinc-300 rounded-xl pl-10 pr-3 py-2.5 text-xs font-bold text-zinc-900 outline-none focus:border-[#d33638]"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* TAB 2: Preferences */}
-            {activeTab === 2 && (
-              <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-2">
-                    Preferred Sports
-                  </label>
-                  {renderChips('preferredSports', PREFERRED_SPORTS_OPTIONS)}
-                </div>
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-2">
-                    Preferred Days
-                  </label>
-                  {renderChips('preferredDays', DAYS_OF_WEEK)}
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1">
-                      Preferred Time
-                    </label>
-                    <select
-                      name="preferredTime"
-                      value={formData.preferredTime}
-                      onChange={handleChange}
-                      className="w-full bg-zinc-50 border border-zinc-300 rounded-xl px-3 py-2.5 text-xs font-bold text-zinc-900 outline-none focus:border-[#d33638]"
-                    >
-                      <option value="">Select...</option>
-                      {PREFERRED_TIME_OPTIONS.map(opt => (
-                        <option key={opt} value={opt}>{opt}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1">
-                      Service Preference
-                    </label>
-                    <select
-                      name="preferredService"
-                      value={formData.preferredService}
-                      onChange={handleChange}
-                      className="w-full bg-zinc-50 border border-zinc-300 rounded-xl px-3 py-2.5 text-xs font-bold text-zinc-900 outline-none focus:border-[#d33638]"
-                    >
-                      <option value="">Select...</option>
-                      {PREFERRED_SERVICE_OPTIONS.map(opt => (
-                        <option key={opt} value={opt}>{opt}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1">
+                    <label className="block text-[10px] font-extrabold uppercase tracking-wider text-zinc-500 mb-1">
                       Skill Level
                     </label>
                     <select
                       name="skillLevel"
                       value={formData.skillLevel}
                       onChange={handleChange}
-                      className="w-full bg-zinc-50 border border-zinc-300 rounded-xl px-3 py-2.5 text-xs font-bold text-zinc-900 outline-none focus:border-[#d33638]"
+                      className="w-full bg-white border border-zinc-200 rounded-xl px-3 py-2 text-xs font-semibold text-zinc-900 outline-none focus:border-[#d33638]"
                     >
-                      <option value="">Select...</option>
                       {SKILL_LEVEL_OPTIONS.map(opt => (
                         <option key={opt} value={opt}>{opt}</option>
                       ))}
                     </select>
                   </div>
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1">
-                      Play Frequency
-                    </label>
-                    <select
-                      name="playFrequency"
-                      value={formData.playFrequency}
-                      onChange={handleChange}
-                      className="w-full bg-zinc-50 border border-zinc-300 rounded-xl px-3 py-2.5 text-xs font-bold text-zinc-900 outline-none focus:border-[#d33638]"
-                    >
-                      <option value="">Select...</option>
-                      {PLAY_FREQUENCY_OPTIONS.map(opt => (
-                        <option key={opt} value={opt}>{opt}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="col-span-2">
-                    <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1">
-                      Preferred Court
-                    </label>
-                    <select
-                      name="preferredCourt"
-                      value={formData.preferredCourt}
-                      onChange={handleChange}
-                      className="w-full bg-zinc-50 border border-zinc-300 rounded-xl px-3 py-2.5 text-xs font-bold text-zinc-900 outline-none focus:border-[#d33638]"
-                    >
-                      <option value="">Select...</option>
-                      <option value="Court 1">Court 1</option>
-                      <option value="Court 2">Court 2</option>
-                      <option value="Court 3">Court 3</option>
-                      <option value="No Preference">No Preference</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-            )}
 
-            {/* TAB 3: Background */}
-            {activeTab === 3 && (
-              <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1">
-                    Occupation
-                  </label>
-                  <input
-                    type="text"
-                    name="occupation"
-                    value={formData.occupation}
-                    onChange={handleChange}
-                    placeholder="e.g. Software Engineer, Student"
-                    className="w-full bg-zinc-50 border border-zinc-300 rounded-xl px-3 py-2.5 text-xs font-bold text-zinc-900 outline-none focus:border-[#d33638]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1">
-                    Company / Organization
-                  </label>
-                  <input
-                    type="text"
-                    name="company"
-                    value={formData.company}
-                    onChange={handleChange}
-                    placeholder="e.g. Tech Corp"
-                    className="w-full bg-zinc-50 border border-zinc-300 rounded-xl px-3 py-2.5 text-xs font-bold text-zinc-900 outline-none focus:border-[#d33638]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-2">
-                    Interests
-                  </label>
-                  {renderChips('interests', INTEREST_OPTIONS)}
-                </div>
-                <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1">
-                      Heard About Us
-                    </label>
-                    <select
-                      name="referredBy"
-                      value={formData.referredBy}
-                      onChange={handleChange}
-                      className="w-full bg-zinc-50 border border-zinc-300 rounded-xl px-3 py-2.5 text-xs font-bold text-zinc-900 outline-none focus:border-[#d33638]"
-                    >
-                      <option value="">Select...</option>
-                      {REFERRAL_SOURCE_OPTIONS.map(opt => (
-                        <option key={opt} value={opt}>{opt}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1">
-                      Membership Type
+                    <label className="block text-[10px] font-extrabold uppercase tracking-wider text-zinc-500 mb-1">
+                      Membership Tier
                     </label>
                     <select
                       name="membershipType"
                       value={formData.membershipType}
                       onChange={handleChange}
-                      className="w-full bg-zinc-50 border border-zinc-300 rounded-xl px-3 py-2.5 text-xs font-bold text-zinc-900 outline-none focus:border-[#d33638]"
+                      className="w-full bg-white border border-zinc-200 rounded-xl px-3 py-2 text-xs font-semibold text-zinc-900 outline-none focus:border-[#d33638]"
                     >
-                      <option value="">Select...</option>
                       {MEMBERSHIP_TYPE_OPTIONS.map(opt => (
                         <option key={opt} value={opt}>{opt}</option>
                       ))}
                     </select>
                   </div>
                 </div>
+
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1">
-                    Admin Notes
+                  <label className="block text-[10px] font-extrabold uppercase tracking-wider text-zinc-500 mb-1">
+                    Special Notes / Preferences
                   </label>
                   <textarea
+                    rows={2}
                     name="notes"
+                    placeholder="e.g. Prefers Court 1, plays with family on Sundays"
                     value={formData.notes}
                     onChange={handleChange}
-                    rows="3"
-                    placeholder="Any special requirements, observations, etc."
-                    className="w-full bg-zinc-50 border border-zinc-300 rounded-xl px-3 py-2.5 text-xs font-bold text-zinc-900 outline-none focus:border-[#d33638] resize-none"
-                  ></textarea>
+                    className="w-full bg-white border border-zinc-200 rounded-xl px-3 py-2 text-xs font-medium text-zinc-900 outline-none focus:border-[#d33638]"
+                  />
                 </div>
               </div>
             )}
-          </form>
-        </div>
+          </div>
 
-        {/* Footer */}
-        <div className="p-6 border-t border-zinc-100 shrink-0 bg-white rounded-b-3xl">
-          <button
-            type="submit"
-            form="customer-form"
-            className="w-full flex items-center justify-center space-x-2 bg-[#d33638] text-white py-4 rounded-xl hover:bg-[#b02a2c] transition-colors font-extrabold shadow-lg shadow-red-900/20"
-          >
-            <CheckCircle2 size={18} />
-            <span>{initialCustomer ? 'Update Customer' : 'Save Customer'}</span>
-          </button>
-        </div>
+          {/* Submit Button */}
+          <div className="pt-2">
+            <button
+              type="submit"
+              className="w-full bg-[#d33638] hover:bg-[#b0292b] text-white py-3.5 rounded-2xl font-black text-sm transition-all shadow-md shadow-red-900/20 active:scale-[0.99] flex items-center justify-center gap-2 uppercase tracking-wider"
+            >
+              <CheckCircle2 size={18} />
+              <span>{initialCustomer ? 'Update Customer Profile' : 'Save Customer to Directory'}</span>
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

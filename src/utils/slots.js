@@ -43,6 +43,33 @@ export const isSlotFullyBooked = (slot, date, serviceType, bookings) => {
   return count >= COURTS.length;
 };
 
+export const minsToTimeString = (m) => {
+  const h = Math.floor(m / 60).toString().padStart(2, '0');
+  const mins = (m % 60).toString().padStart(2, '0');
+  return `${h}:${mins}`;
+};
+
+export const formatTo12Hour = (time24) => {
+  if (!time24 || typeof time24 !== 'string') return '';
+  const [hStr, mStr] = time24.split(':');
+  let h = parseInt(hStr, 10);
+  const m = mStr || '00';
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  return `${h}:${m} ${ampm}`;
+};
+
+export const generateSlotsFromStartAndDuration = (startTime, durationMins = 60) => {
+  if (!startTime) return [];
+  const startM = timeToMins(startTime);
+  const endM = startM + durationMins;
+  const slots = [];
+  for (let m = startM; m < endM; m += 30) {
+    slots.push(minsToTimeString(m));
+  }
+  return slots;
+};
+
 export const assignResource = (startMins, endMins, date, serviceType, bookings) => {
   for (let res of COURTS) {
     const isFree = !bookings.some(b => {

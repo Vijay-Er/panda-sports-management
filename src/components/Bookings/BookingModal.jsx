@@ -1,7 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   X, CalendarDays, Users, Plus, Minus, Trash2, 
-  Smartphone, Tag, Info, AlertCircle, Receipt, Search, Sparkles, UserCheck 
+  Smartphone, Tag, Info, AlertCircle, Receipt, Search, Sparkles, UserCheck,
+  Clock, Check, CheckCircle2, Sun, Moon, LayoutGrid 
 } from 'lucide-react';
 import { 
   generateTimeSlots, 
@@ -9,7 +10,10 @@ import {
   isSlotFullyBooked, 
   timeToMins, 
   assignResource, 
-  getLocalYYYYMMDD 
+  getLocalYYYYMMDD,
+  formatTo12Hour,
+  minsToTimeString,
+  generateSlotsFromStartAndDuration
 } from '../../utils/slots';
 
 export default function BookingModal({
@@ -55,6 +59,78 @@ export default function BookingModal({
 
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
 
+  // User-Friendly Time Picker State (12h format + 1-click duration presets)
+  const [timePickerMode, setTimePickerMode] = useState('simple'); // 'simple' (default) or 'grid'
+  const [startTime, setStartTime] = useState(() => {
+    const now = new Date();
+    const h = now.getHours();
+    const m = now.getMinutes() >= 30 ? '30' : '00';
+    const startH = Math.max(6, Math.min(22, h));
+    return `${String(startH).padStart(2, '0')}:${m}`;
+  });
+  const [durationMins, setDurationMins] = useState(60);
+
+  // Sync slots and price calculation helper
+  const applyTimeSelection = (sTime, dur, curDate = bookingForm.date) => {
+    const newSlots = generateSlotsFromStartAndDuration(sTime, dur);
+    const durationHours = dur / 60;
+    const [y, m, d] = (curDate || getLocalYYYYMMDD()).split('-').map(Number);
+    const dateObj = new Date(y, m - 1, d);
+    const dayOfWeek = dateObj.getDay();
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+    const hasEvening = newSlots.some(s => parseInt(s.split(':')[0], 10) >= 18);
+    const ratePerHour = (isWeekend || hasEvening) ? 700 : 500;
+    const suggestedPrice = Math.round(durationHours * ratePerHour);
+
+    setBookingForm(prev => ({
+      ...prev,
+      selectedSlots: newSlots,
+      courtPrice: suggestedPrice.toString()
+    }));
+  };
+
+  // Sync on modal open
+  useEffect(() => {
+    if (isOpen) {
+      applyTimeSelection(startTime, durationMins, bookingForm.date);
+    }
+  }, [isOpen]);
+
+  const handleStartTimeChange = (newStartTime) => {
+    setStartTime(newStartTime);
+    applyTimeSelection(newStartTime, durationMins, bookingForm.date);
+  };
+
+  const handleDurationChange = (newDurationMins) => {
+    setDurationMins(newDurationMins);
+    applyTimeSelection(startTime, newDurationMins, bookingForm.date);
+  };
+
+  const handleEndTimeChange = (newEndTime) => {
+    const endM = timeToMins(newEndTime);
+    const startM = timeToMins(startTime);
+    if (endM > startM) {
+      const diff = endM - startM;
+      setDurationMins(diff);
+      applyTimeSelection(startTime, diff, bookingForm.date);
+    }
+  };
+
+  const handleDateChange = (newDate) => {
+    setBookingForm(prev => ({ ...prev, date: newDate }));
+    applyTimeSelection(startTime, durationMins, newDate);
+  };
+
+  const selectedEndTime = useMemo(() => {
+    return minsToTimeString(timeToMins(startTime) + durationMins);
+  }, [startTime, durationMins]);
+
+  const assignedFreeCourt = useMemo(() => {
+    const startM = timeToMins(startTime);
+    const endM = startM + durationMins;
+    return assignResource(startM, endM, bookingForm.date, bookingForm.serviceType, bookings);
+  }, [startTime, durationMins, bookingForm.date, bookingForm.serviceType, bookings]);
+
   // Pre-fill or sync customer when prefilledCustomer is provided
   React.useEffect(() => {
     if (prefilledCustomer && isOpen) {
@@ -70,8 +146,7 @@ export default function BookingModal({
   React.useEffect(() => {
     setBookingForm(prev => ({
       ...prev,
-      serviceType: initialServiceType === 'group' ? 'group' : 'court',
-      selectedSlots: []
+      serviceType: initialServiceType === 'group' ? 'group' : 'court'
     }));
   }, [initialServiceType, isOpen]);
 
@@ -207,22 +282,20 @@ export default function BookingModal({
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (bookingForm.selectedSlots.length === 0) return;
-
-    const startTime = bookingForm.selectedSlots[0];
-    const endTime = calculateEndFromSlots(bookingForm.selectedSlots);
-    const duration = bookingForm.selectedSlots.length * 30;
+    const finalStartTime = bookingForm.selectedSlots.length > 0 ? bookingForm.selectedSlots[0] : startTime;
+    const finalEndTime = bookingForm.selectedSlots.length > 0 ? calculateEndFromSlots(bookingForm.selectedSlots) : selectedEndTime;
+    const finalDuration = bookingForm.selectedSlots.length > 0 ? (bookingForm.selectedSlots.length * 30) : durationMins;
 
     const resource = assignResource(
-      timeToMins(startTime),
-      timeToMins(endTime),
+      timeToMins(finalStartTime),
+      timeToMins(finalEndTime),
       bookingForm.date,
       bookingForm.serviceType,
       bookings
     );
 
     if (!resource) {
-      alert("No available court for the selected time slot. Please select another slot or date.");
+      alert("No available court for the selected time slot. Please select another time slot or date.");
       return;
     }
 
@@ -286,9 +359,9 @@ export default function BookingModal({
       resourceName: resource.name,
       customerName: finalCustomerName,
       customerPhone: bookingForm.customerPhone.trim(),
-      startTime: startTime,
-      endTime: endTime,
-      duration: duration.toString(),
+      startTime: finalStartTime,
+      endTime: finalEndTime,
+      duration: finalDuration.toString(),
       date: bookingForm.date,
       courtPrice: parseFloat(bookingForm.courtPrice) || 0,
       rentals: {
@@ -349,61 +422,295 @@ export default function BookingModal({
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-6 space-y-5 overflow-y-auto">
           {/* Date & Time Slot Selection */}
-          <div className="bg-zinc-50 p-4 rounded-2xl border border-zinc-200">
-            <div className="mb-3.5">
-              <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1">
-                Play Date
-              </label>
+          <div className="bg-zinc-50 p-4 rounded-2xl border border-zinc-200 space-y-4">
+            {/* Play Date with Quick Today / Tomorrow Buttons */}
+            <div>
+              <div className="flex justify-between items-center mb-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-zinc-600 flex items-center gap-1.5">
+                  <CalendarDays size={14} className="text-[#d33638]" />
+                  Play Date
+                </label>
+                <div className="flex gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => handleDateChange(getLocalYYYYMMDD())}
+                    className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-lg border transition-all ${
+                      bookingForm.date === getLocalYYYYMMDD()
+                        ? 'bg-[#d33638] text-white border-[#d33638] shadow-sm'
+                        : 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-100'
+                    }`}
+                  >
+                    Today
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const tom = new Date();
+                      tom.setDate(tom.getDate() + 1);
+                      handleDateChange(getLocalYYYYMMDD(tom));
+                    }}
+                    className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-lg border transition-all ${
+                      bookingForm.date !== getLocalYYYYMMDD()
+                        ? 'bg-[#d33638] text-white border-[#d33638] shadow-sm'
+                        : 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-100'
+                    }`}
+                  >
+                    Tomorrow
+                  </button>
+                </div>
+              </div>
               <input
                 required
                 type="date"
                 value={bookingForm.date}
-                onChange={e => setBookingForm({ ...bookingForm, date: e.target.value, selectedSlots: [] })}
-                className="w-full bg-white border border-zinc-300 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-black outline-none text-xs font-semibold"
+                onChange={e => handleDateChange(e.target.value)}
+                className="w-full bg-white border border-zinc-300 rounded-xl px-3 py-2 text-xs font-bold text-zinc-800 outline-none focus:ring-2 focus:ring-[#d33638]"
               />
             </div>
 
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-zinc-600">Select Time Slots</span>
-                {bookingForm.selectedSlots.length > 0 && (
-                  <span className="text-xs font-extrabold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
-                    {bookingForm.selectedSlots.length * 30} mins
-                  </span>
-                )}
-              </div>
+            {/* Time Selection Header with Mode Toggle */}
+            <div className="flex justify-between items-center pt-2 border-t border-zinc-200/60">
+              <span className="text-xs font-bold uppercase tracking-wider text-zinc-700 flex items-center gap-1.5">
+                <Clock size={14} className="text-[#d33638]" />
+                Select Playing Time
+              </span>
+              <button
+                type="button"
+                onClick={() => setTimePickerMode(prev => prev === 'simple' ? 'grid' : 'simple')}
+                className="text-[11px] font-extrabold text-[#d33638] hover:underline flex items-center gap-1 bg-white border border-red-200 px-2 py-0.5 rounded-lg transition-colors"
+              >
+                {timePickerMode === 'simple' ? '🔲 Switch to Slot Grid' : '⚡ Simple Time Picker'}
+              </button>
+            </div>
 
-              <div className="grid grid-cols-4 sm:grid-cols-6 gap-1.5 max-h-40 overflow-y-auto p-2 bg-white border border-zinc-200 rounded-xl">
-                {timeSlots.map(slot => {
-                  const booked = isSlotFullyBooked(slot, bookingForm.date, bookingForm.serviceType, bookings);
-                  const selected = bookingForm.selectedSlots.includes(slot);
-
-                  return (
+            {timePickerMode === 'simple' ? (
+              <div className="space-y-3.5">
+                {/* Quick Period Buttons: Morning / Afternoon / Evening / Night */}
+                <div>
+                  <div className="grid grid-cols-3 gap-1.5">
                     <button
-                      key={slot}
                       type="button"
-                      disabled={booked}
-                      onClick={() => handleSlotClick(slot)}
-                      className={`py-1.5 text-xs font-bold rounded-lg transition-all ${
-                        booked
-                          ? 'bg-zinc-100 text-zinc-300 cursor-not-allowed line-through'
-                          : selected
-                          ? 'bg-[#d33638] text-white shadow-sm border-[#d33638]'
-                          : 'bg-white text-zinc-700 border border-zinc-200 hover:border-[#d33638] hover:bg-red-50'
+                      onClick={() => handleStartTimeChange('06:00')}
+                      className={`py-1.5 px-2 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-1 ${
+                        timeToMins(startTime) < 720
+                          ? 'bg-amber-100 text-amber-900 border-amber-300 shadow-sm font-black'
+                          : 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-100'
                       }`}
                     >
-                      {slot}
+                      <span>🌅 Morning</span>
                     </button>
-                  );
-                })}
-              </div>
-
-              {bookingForm.selectedSlots.length > 0 && (
-                <div className="mt-2.5 text-center bg-zinc-100/90 py-1.5 rounded-xl text-xs font-bold text-zinc-800 border border-zinc-200">
-                  {bookingForm.selectedSlots[0]} → {calculateEndFromSlots(bookingForm.selectedSlots)}
+                    <button
+                      type="button"
+                      onClick={() => handleStartTimeChange('14:00')}
+                      className={`py-1.5 px-2 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-1 ${
+                        timeToMins(startTime) >= 720 && timeToMins(startTime) < 1020
+                          ? 'bg-blue-100 text-blue-900 border-blue-300 shadow-sm font-black'
+                          : 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-100'
+                      }`}
+                    >
+                      <span>☀️ Afternoon</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleStartTimeChange('18:00')}
+                      className={`py-1.5 px-2 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-1 ${
+                        timeToMins(startTime) >= 1020
+                          ? 'bg-purple-100 text-purple-900 border-purple-300 shadow-sm font-black'
+                          : 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-100'
+                      }`}
+                    >
+                      <span>🌆 Evening / Prime</span>
+                    </button>
+                  </div>
                 </div>
-              )}
-            </div>
+
+                {/* Start Time & End Time Dropdowns */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-extrabold uppercase text-zinc-600 mb-1">
+                      Start Time (12-Hour AM/PM)
+                    </label>
+                    <select
+                      value={startTime}
+                      onChange={(e) => handleStartTimeChange(e.target.value)}
+                      className="w-full bg-white border border-zinc-300 rounded-xl px-3 py-2.5 text-xs font-black text-zinc-900 outline-none focus:ring-2 focus:ring-[#d33638] shadow-sm cursor-pointer"
+                    >
+                      <optgroup label="🌅 Morning (06:00 AM – 12:00 PM)">
+                        {timeSlots.filter(s => timeToMins(s) < 720).map(s => {
+                          const booked = isSlotFullyBooked(s, bookingForm.date, bookingForm.serviceType, bookings);
+                          return (
+                            <option key={s} value={s}>
+                              {formatTo12Hour(s)} {booked ? '(Courts Busy)' : ''}
+                            </option>
+                          );
+                        })}
+                      </optgroup>
+                      <optgroup label="☀️ Afternoon (12:00 PM – 05:00 PM)">
+                        {timeSlots.filter(s => timeToMins(s) >= 720 && timeToMins(s) < 1020).map(s => {
+                          const booked = isSlotFullyBooked(s, bookingForm.date, bookingForm.serviceType, bookings);
+                          return (
+                            <option key={s} value={s}>
+                              {formatTo12Hour(s)} {booked ? '(Courts Busy)' : ''}
+                            </option>
+                          );
+                        })}
+                      </optgroup>
+                      <optgroup label="🌆 Evening / Prime (05:00 PM – 10:00 PM)">
+                        {timeSlots.filter(s => timeToMins(s) >= 1020 && timeToMins(s) < 1320).map(s => {
+                          const booked = isSlotFullyBooked(s, bookingForm.date, bookingForm.serviceType, bookings);
+                          return (
+                            <option key={s} value={s}>
+                              {formatTo12Hour(s)} {booked ? '(Courts Busy)' : ''}
+                            </option>
+                          );
+                        })}
+                      </optgroup>
+                      <optgroup label="🌙 Night (10:00 PM – 11:30 PM)">
+                        {timeSlots.filter(s => timeToMins(s) >= 1320).map(s => {
+                          const booked = isSlotFullyBooked(s, bookingForm.date, bookingForm.serviceType, bookings);
+                          return (
+                            <option key={s} value={s}>
+                              {formatTo12Hour(s)} {booked ? '(Courts Busy)' : ''}
+                            </option>
+                          );
+                        })}
+                      </optgroup>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-extrabold uppercase text-zinc-600 mb-1">
+                      End Time
+                    </label>
+                    <select
+                      value={selectedEndTime}
+                      onChange={(e) => handleEndTimeChange(e.target.value)}
+                      className="w-full bg-white border border-zinc-300 rounded-xl px-3 py-2.5 text-xs font-black text-zinc-900 outline-none focus:ring-2 focus:ring-[#d33638] shadow-sm cursor-pointer"
+                    >
+                      {timeSlots.filter(s => timeToMins(s) > timeToMins(startTime)).concat(['24:00']).map(s => {
+                        const dur = timeToMins(s) - timeToMins(startTime);
+                        return (
+                          <option key={s} value={s}>
+                            {formatTo12Hour(s)} ({dur} mins)
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Quick 1-Click Duration Chips */}
+                <div>
+                  <label className="block text-[11px] font-extrabold uppercase text-zinc-600 mb-1.5 flex items-center justify-between">
+                    <span>Quick Duration Presets (1-Click)</span>
+                    <span className="text-[10px] text-zinc-400 font-semibold">{durationMins} mins selected</span>
+                  </label>
+                  <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
+                    {[
+                      { mins: 30, label: '30 mins' },
+                      { mins: 60, label: '1 Hour' },
+                      { mins: 90, label: '1.5 Hours' },
+                      { mins: 120, label: '2 Hours' },
+                      { mins: 180, label: '3 Hours' }
+                    ].map(d => {
+                      const isSelected = durationMins === d.mins;
+                      return (
+                        <button
+                          key={d.mins}
+                          type="button"
+                          onClick={() => handleDurationChange(d.mins)}
+                          className={`py-2 px-1.5 rounded-xl text-xs font-black border transition-all text-center ${
+                            isSelected
+                              ? 'bg-[#d33638] text-white border-[#d33638] shadow-md shadow-red-900/20 scale-[1.02]'
+                              : 'bg-white hover:bg-zinc-100 text-zinc-700 border-zinc-200'
+                          }`}
+                        >
+                          {d.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Live Slot Summary & Court Allocation Badge */}
+                <div className={`p-3.5 rounded-2xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 transition-all ${
+                  assignedFreeCourt
+                    ? 'bg-emerald-50/90 border-emerald-200 text-emerald-950'
+                    : 'bg-red-50/90 border-red-200 text-red-950'
+                }`}>
+                  <div className="flex items-center gap-2.5">
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                      assignedFreeCourt ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'
+                    }`}>
+                      <Clock size={18} />
+                    </div>
+                    <div>
+                      <span className="text-xs font-black block text-zinc-900">
+                        {formatTo12Hour(startTime)} → {formatTo12Hour(selectedEndTime)} ({durationMins} mins)
+                      </span>
+                      <span className="text-[11px] font-semibold text-zinc-600">
+                        {assignedFreeCourt ? `Allocated: ${assignedFreeCourt.name}` : 'All courts are occupied for this slot'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="self-end sm:self-auto shrink-0">
+                    {assignedFreeCourt ? (
+                      <span className="text-[10px] font-black uppercase bg-emerald-200 text-emerald-900 px-2.5 py-1 rounded-lg flex items-center gap-1 shadow-xs">
+                        <CheckCircle2 size={12} /> Court Free
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-black uppercase bg-red-200 text-red-900 px-2.5 py-1 rounded-lg flex items-center gap-1 shadow-xs">
+                        <AlertCircle size={12} /> Slot Busy
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              /* Classic Slot Grid View (If Toggled) */
+              <div className="space-y-2">
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-xs font-bold text-zinc-600">Click 30-min buttons to toggle slots:</span>
+                  {bookingForm.selectedSlots.length > 0 && (
+                    <span className="text-xs font-extrabold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                      {bookingForm.selectedSlots.length * 30} mins
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-4 sm:grid-cols-6 gap-1.5 max-h-44 overflow-y-auto p-2 bg-white border border-zinc-200 rounded-xl">
+                  {timeSlots.map(slot => {
+                    const booked = isSlotFullyBooked(slot, bookingForm.date, bookingForm.serviceType, bookings);
+                    const selected = bookingForm.selectedSlots.includes(slot);
+
+                    return (
+                      <button
+                        key={slot}
+                        type="button"
+                        disabled={booked}
+                        onClick={() => handleSlotClick(slot)}
+                        className={`py-1.5 text-xs font-bold rounded-lg transition-all ${
+                          booked
+                            ? 'bg-zinc-100 text-zinc-300 cursor-not-allowed line-through'
+                            : selected
+                            ? 'bg-[#d33638] text-white shadow-sm border-[#d33638]'
+                            : 'bg-white text-zinc-700 border border-zinc-200 hover:border-[#d33638] hover:bg-red-50'
+                        }`}
+                      >
+                        {formatTo12Hour(slot)}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {bookingForm.selectedSlots.length > 0 && (
+                  <div className="mt-2 text-center bg-zinc-100/90 py-1.5 rounded-xl text-xs font-bold text-zinc-800 border border-zinc-200">
+                    {formatTo12Hour(bookingForm.selectedSlots[0])} → {formatTo12Hour(calculateEndFromSlots(bookingForm.selectedSlots))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Customer Name & Mobile with Auto-Suggest and Auto-Registration Info */}
@@ -1002,10 +1309,10 @@ export default function BookingModal({
 
           <button
             type="submit"
-            disabled={bookingForm.selectedSlots.length === 0}
+            disabled={bookingForm.selectedSlots.length === 0 || !assignedFreeCourt}
             className="w-full bg-[#d33638] text-white py-3.5 rounded-xl font-extrabold text-sm hover:bg-[#b42628] transition-all shadow-lg shadow-red-900/20 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.99] uppercase tracking-wider font-sports"
           >
-            Confirm & Lock Court Reservation
+            {assignedFreeCourt ? 'Confirm & Lock Court Reservation' : '⚠️ No Court Available For This Slot'}
           </button>
         </form>
       </div>

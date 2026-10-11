@@ -3,12 +3,13 @@ import {
   Download, Printer, TrendingDown, TrendingUp, AlertTriangle, 
   Search, Filter, Banknote, Smartphone, CreditCard, Calendar,
   ChevronDown, FileSpreadsheet, ArrowUpRight, ArrowDownRight, Scale,
-  Clock, Sun, Moon
+  Clock, Sun, Moon, PieChart as PieIcon, LayoutGrid, BarChart2
 } from 'lucide-react';
 import { getLocalYYYYMMDD } from '../../utils/slots';
 import ShiftHandoverModal from './ShiftHandoverModal';
 import ShiftHandoversTable from './ShiftHandoversTable';
 import EODSummaryModal from './EODSummaryModal';
+import AccountCharts from './AccountCharts';
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -42,6 +43,7 @@ export default function AccountsTab({
   const [activeAccountView, setActiveAccountView] = useState('transactions');
   const [isShiftModalOpen, setIsShiftModalOpen] = useState(false);
   const [isEODModalOpen, setIsEODModalOpen] = useState(false);
+  const [accountsDisplayMode, setAccountsDisplayMode] = useState('both'); // 'cards', 'charts', 'both'
 
   // Period Filter State
   const [periodType, setPeriodType] = useState('month'); // 'all', 'month', 'quarter', 'year', 'custom'
@@ -568,48 +570,115 @@ export default function AccountsTab({
         </div>
       </div>
 
-      {/* ACTIVE REGISTER BALANCES SUMMARY */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-emerald-50/80 p-4 rounded-2xl border border-emerald-100/80 flex flex-col justify-center">
-          <span className="text-[11px] font-bold text-emerald-700 uppercase mb-1 flex items-center gap-1.5">
-            <Banknote size={15} /> Current Cash in Hand
-          </span>
-          <span className="text-2xl font-black text-emerald-950">₹{accounts.cash.toLocaleString()}</span>
-        </div>
-
-        <div className="bg-blue-50/80 p-4 rounded-2xl border border-blue-100/80 flex flex-col justify-center">
-          <span className="text-[11px] font-bold text-blue-700 uppercase mb-1 flex items-center gap-1.5">
-            <Smartphone size={15} /> Current UPI Balance
-          </span>
-          <span className="text-2xl font-black text-blue-950">₹{accounts.upi.toLocaleString()}</span>
-        </div>
-
-        <div className="bg-purple-50/80 p-4 rounded-2xl border border-purple-100/80 flex flex-col justify-center">
-          <span className="text-[11px] font-bold text-purple-700 uppercase mb-1 flex items-center gap-1.5">
-            <CreditCard size={15} /> Current Turftown Balance
-          </span>
-          <span className="text-2xl font-black text-purple-950">₹{accounts.turftown.toLocaleString()}</span>
-        </div>
-
-        {/* Beverage Sales Breakdown */}
-        <div className="bg-white p-4 rounded-2xl border border-zinc-200 flex flex-col justify-start overflow-y-auto max-h-36 shadow-sm">
-          <span className="text-[11px] font-bold text-zinc-500 uppercase mb-2 sticky top-0 bg-white">
-            Beverage & Snack Breakdown
-          </span>
-          <div className="space-y-1 pr-1">
-            {Object.entries(accounts.beveragesBreakdown).length === 0 ? (
-              <span className="text-xs text-zinc-400 italic">No sales recorded yet</span>
-            ) : (
-              Object.entries(accounts.beveragesBreakdown).map(([name, amount]) => (
-                <div key={name} className="flex justify-between items-center text-xs border-b border-zinc-50 pb-1">
-                  <span className="text-zinc-700 font-medium truncate mr-2">{name}</span>
-                  <span className="font-bold text-zinc-900 shrink-0">₹{Number(amount).toLocaleString()}</span>
-                </div>
-              ))
-            )}
+      {/* FINANCIAL INSIGHTS & CHARTS VIEW MODE SWITCHER */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white p-3.5 rounded-2xl border border-zinc-200 shadow-sm print:hidden">
+        <div className="flex items-center gap-2">
+          <PieIcon size={18} className="text-[#d33638]" />
+          <div>
+            <h4 className="text-xs font-black text-zinc-900 leading-tight">Financial Visual Charts & Balances</h4>
+            <p className="text-[10px] text-zinc-400 font-medium">Interactive payment mode distribution, cash flow comparison & POS breakdown</p>
           </div>
         </div>
+
+        <div className="flex items-center gap-1 bg-zinc-100 p-1 rounded-xl w-full sm:w-auto justify-end">
+          <button
+            type="button"
+            onClick={() => setAccountsDisplayMode('cards')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+              accountsDisplayMode === 'cards' 
+                ? 'bg-white text-zinc-950 shadow-sm' 
+                : 'text-zinc-600 hover:text-zinc-900'
+            }`}
+            title="Display standard register cards"
+          >
+            <LayoutGrid size={13} />
+            <span>Cards</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setAccountsDisplayMode('charts')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+              accountsDisplayMode === 'charts' 
+                ? 'bg-white text-zinc-950 shadow-sm' 
+                : 'text-zinc-600 hover:text-zinc-900'
+            }`}
+            title="Display visual pie & bar charts"
+          >
+            <PieIcon size={13} />
+            <span>Charts</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setAccountsDisplayMode('both')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+              accountsDisplayMode === 'both' 
+                ? 'bg-white text-zinc-950 shadow-sm' 
+                : 'text-zinc-600 hover:text-zinc-900'
+            }`}
+            title="Display both cards and charts side by side"
+          >
+            <BarChart2 size={13} />
+            <span>Both</span>
+          </button>
+        </div>
       </div>
+
+      {/* VISUAL CHARTS SECTION */}
+      {(accountsDisplayMode === 'charts' || accountsDisplayMode === 'both') && (
+        <AccountCharts 
+          accounts={accounts}
+          periodMetrics={periodMetrics}
+          periodLabel={periodLabel}
+          periodFilteredTransactions={periodFilteredTransactions}
+        />
+      )}
+
+      {/* ACTIVE REGISTER BALANCES SUMMARY */}
+      {(accountsDisplayMode === 'cards' || accountsDisplayMode === 'both') && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-emerald-50/80 p-4 rounded-2xl border border-emerald-100/80 flex flex-col justify-center">
+            <span className="text-[11px] font-bold text-emerald-700 uppercase mb-1 flex items-center gap-1.5">
+              <Banknote size={15} /> Current Cash in Hand
+            </span>
+            <span className="text-2xl font-black text-emerald-950">₹{accounts.cash.toLocaleString()}</span>
+          </div>
+
+          <div className="bg-blue-50/80 p-4 rounded-2xl border border-blue-100/80 flex flex-col justify-center">
+            <span className="text-[11px] font-bold text-blue-700 uppercase mb-1 flex items-center gap-1.5">
+              <Smartphone size={15} /> Current UPI Balance
+            </span>
+            <span className="text-2xl font-black text-blue-950">₹{accounts.upi.toLocaleString()}</span>
+          </div>
+
+          <div className="bg-purple-50/80 p-4 rounded-2xl border border-purple-100/80 flex flex-col justify-center">
+            <span className="text-[11px] font-bold text-purple-700 uppercase mb-1 flex items-center gap-1.5">
+              <CreditCard size={15} /> Current Turftown Balance
+            </span>
+            <span className="text-2xl font-black text-purple-950">₹{accounts.turftown.toLocaleString()}</span>
+          </div>
+
+          {/* Beverage Sales Breakdown */}
+          <div className="bg-white p-4 rounded-2xl border border-zinc-200 flex flex-col justify-start overflow-y-auto max-h-36 shadow-sm">
+            <span className="text-[11px] font-bold text-zinc-500 uppercase mb-2 sticky top-0 bg-white">
+              Beverage & Snack Breakdown
+            </span>
+            <div className="space-y-1 pr-1">
+              {Object.entries(accounts.beveragesBreakdown).length === 0 ? (
+                <span className="text-xs text-zinc-400 italic">No sales recorded yet</span>
+              ) : (
+                Object.entries(accounts.beveragesBreakdown).map(([name, amount]) => (
+                  <div key={name} className="flex justify-between items-center text-xs border-b border-zinc-50 pb-1">
+                    <span className="text-zinc-700 font-medium truncate mr-2">{name}</span>
+                    <span className="font-bold text-zinc-900 shrink-0">₹{Number(amount).toLocaleString()}</span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Search & Category Filter Toolbar - Hidden on print */}
       <div className="bg-white p-3.5 rounded-2xl border border-zinc-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3 print:hidden">

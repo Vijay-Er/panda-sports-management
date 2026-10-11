@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { 
   Users, UserPlus, Search, Phone, MessageSquare, Calendar, Award, 
   DollarSign, Clock, Edit, Trash2, ExternalLink, Download, Sunrise, 
-  Sunset, MapPin, Briefcase, Ticket, Wallet, Star
+  Sunset, MapPin, Briefcase, Ticket, Wallet, Star, Shield, Heart
 } from 'lucide-react';
 
 export default function CustomersTab({
@@ -50,8 +50,8 @@ export default function CustomersTab({
       const studentSpend = playerStudents.reduce((sum, s) => sum + (Number(s.feeAmount || s.monthlyFee) || 0), 0);
       const totalSpend = bookingSpend + studentSpend + (Number(cust.totalSpend) || 0);
 
-      const isCourtPlayer = totalMatches > 0;
-      const isAcademyStudent = playerStudents.length > 0;
+      const isCourtPlayer = totalMatches > 0 || (cust.particulars || []).includes('Court Booking');
+      const isAcademyStudent = playerStudents.length > 0 || (cust.particulars || []).includes('Karate');
 
       return {
         ...cust,
@@ -71,17 +71,27 @@ export default function CustomersTab({
       const matchesSearch = !term ||
         cust.name?.toLowerCase().includes(term) ||
         cust.phone?.includes(term) ||
+        cust.emergencyPhone?.includes(term) ||
         cust.area?.toLowerCase().includes(term) ||
-        cust.occupation?.toLowerCase().includes(term) ||
-        cust.email?.toLowerCase().includes(term);
+        cust.teamName?.toLowerCase().includes(term) ||
+        cust.associatedMembers?.toLowerCase().includes(term) ||
+        cust.parentName?.toLowerCase().includes(term) ||
+        cust.referredBy?.toLowerCase().includes(term) ||
+        cust.professionType?.toLowerCase().includes(term) ||
+        cust.professionComments?.toLowerCase().includes(term) ||
+        cust.comments?.toLowerCase().includes(term);
 
       if (!matchesSearch) return false;
 
+      const particulars = cust.particulars || [];
+      const timeStr = (cust.availableTime || cust.preferredTime || '').toLowerCase();
+
       switch (activeFilter) {
-        case 'Court': return cust.isCourtPlayer || cust.preferredService === 'Court Booking';
-        case 'Academy': return cust.isAcademyStudent || cust.preferredService === 'Academy Only';
-        case 'Morning': return cust.preferredTime === 'Morning' || cust.preferredTime === 'Both';
-        case 'Evening': return cust.preferredTime === 'Evening' || cust.preferredTime === 'Both';
+        case 'Court': return cust.isCourtPlayer || particulars.includes('Court Booking');
+        case 'Group Game': return particulars.includes('Group Game');
+        case 'Karate': return cust.isAcademyStudent || particulars.includes('Karate');
+        case 'Morning': return timeStr.includes('morning') || cust.preferredTime === 'Both';
+        case 'Evening': return timeStr.includes('evening') || cust.preferredTime === 'Both';
         case 'All':
         default: return true;
       }
@@ -90,21 +100,39 @@ export default function CustomersTab({
 
   // Stats
   const totalCustomers = enrichedCustomers.length;
-  const morningCount = enrichedCustomers.filter(c => c.preferredTime === 'Morning' || c.preferredTime === 'Both').length;
-  const eveningCount = enrichedCustomers.filter(c => c.preferredTime === 'Evening' || c.preferredTime === 'Both').length;
+  const morningCount = enrichedCustomers.filter(c => (c.availableTime || c.preferredTime || '').toLowerCase().includes('morning') || c.preferredTime === 'Both').length;
+  const eveningCount = enrichedCustomers.filter(c => (c.availableTime || c.preferredTime || '').toLowerCase().includes('evening') || c.preferredTime === 'Both').length;
   const totalSpendSum = enrichedCustomers.reduce((sum, c) => sum + (Number(c.totalSpend) || 0), 0);
 
-  // CSV Export
+  // CSV Export including all handwritten fields
   const handleExportCSV = () => {
-    const headers = ['Name', 'Phone', 'Area', 'Time Preference', 'Play Style', 'Occupation', 'Interests', 'Total Hours', 'Total Spend'];
+    const headers = [
+      'Customer Name', 'Contact 1', 'Emergency Contact 2', 'Blood Group', 
+      'Location', 'Profession Type', 'Work Time', 'Profession Details', 
+      'Referred By', 'Available Days', 'Available Time', 'Age', 'Gender', 
+      'Particulars', 'Parents Name', 'Team / Group Name', 'Associated Members', 
+      'Comments', 'Total Hours', 'Total Spend'
+    ];
+    
     const rows = filteredCustomers.map(c => [
       `"${c.name || ''}"`,
       `"${c.phone || ''}"`,
+      `"${c.emergencyPhone || ''}"`,
+      `"${c.bloodGroup || ''}"`,
       `"${c.area || ''}"`,
-      `"${c.preferredTime || ''}"`,
-      `"${c.preferredService || ''}"`,
-      `"${c.occupation || ''}"`,
-      `"${(c.interests || []).join('; ')}"`,
+      `"${c.professionType || ''}"`,
+      `"${c.workTime || ''}"`,
+      `"${c.professionComments || ''}"`,
+      `"${c.referredBy || ''}"`,
+      `"${(c.availableDays || []).join(', ')}"`,
+      `"${c.availableTime || c.preferredTime || ''}"`,
+      `"${c.age || ''}"`,
+      `"${c.gender || ''}"`,
+      `"${(c.particulars || []).join(', ')}"`,
+      `"${c.parentName || ''}"`,
+      `"${c.teamName || ''}"`,
+      `"${c.associatedMembers || ''}"`,
+      `"${c.comments || c.notes || ''}"`,
       `"${c.totalHours || 0}"`,
       `"${c.totalSpend || 0}"`
     ]);
@@ -113,7 +141,7 @@ export default function CustomersTab({
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `Panda_Customers_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `Panda_Customers_Register_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -125,13 +153,13 @@ export default function CustomersTab({
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-5 rounded-2xl border border-zinc-200/80 shadow-sm">
         <div>
           <div className="flex items-center gap-2.5">
-            <h2 className="text-xl font-black text-zinc-900 tracking-tight">Customer Database</h2>
+            <h2 className="text-xl font-black text-zinc-900 tracking-tight">Customer Register & CRM</h2>
             <span className="bg-red-50 text-[#d33638] text-[11px] font-black px-2.5 py-0.5 rounded-full border border-red-200">
-              {totalCustomers} Players
+              {totalCustomers} Registered
             </span>
           </div>
           <p className="text-xs text-zinc-500 font-medium mt-0.5">
-            Player preferences, morning/evening slots, localities, and direct booking
+            Player contacts, profession, teams, timings, particulars & emergency contacts
           </p>
         </div>
 
@@ -140,7 +168,7 @@ export default function CustomersTab({
             type="button"
             onClick={handleExportCSV}
             className="flex-1 md:flex-none px-3.5 py-2.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-xl font-bold text-xs transition-colors flex items-center justify-center gap-1.5"
-            title="Download CSV report"
+            title="Download CSV register"
           >
             <Download size={15} />
             <span>Export CSV</span>
@@ -206,7 +234,7 @@ export default function CustomersTab({
           <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
           <input
             type="text"
-            placeholder="Search player name, mobile, area (e.g. Anna Nagar), or occupation..."
+            placeholder="Search by name, team (e.g. Prasanna Team), mobile, area, reference, profession..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-9 pr-3 py-2 bg-zinc-50 border border-zinc-200 focus:border-[#d33638] focus:bg-white rounded-xl text-xs font-semibold text-zinc-900 outline-none transition-all placeholder:text-zinc-400"
@@ -219,7 +247,8 @@ export default function CustomersTab({
             { id: 'Morning', label: '🌅 Morning', count: morningCount },
             { id: 'Evening', label: '🌆 Evening', count: eveningCount },
             { id: 'Court', label: '🏸 Court' },
-            { id: 'Academy', label: '🥋 Academy' }
+            { id: 'Group Game', label: '👥 Group Game' },
+            { id: 'Karate', label: '🥋 Karate' }
           ].map(f => {
             const isActive = activeFilter === f.id;
             return (
@@ -254,10 +283,10 @@ export default function CustomersTab({
             <thead>
               <tr className="bg-zinc-50/80 border-b border-zinc-200 text-[10px] font-black uppercase tracking-wider text-zinc-500">
                 <th className="p-4">Customer Details</th>
-                <th className="p-4">Preferences</th>
-                <th className="p-4">Hours & Pass</th>
-                <th className="p-4">Total Spend</th>
-                <th className="p-4 text-right">Quick Actions</th>
+                <th className="p-4">Particulars & Schedule</th>
+                <th className="p-4">Profession & Reference</th>
+                <th className="p-4">Hours & Spend</th>
+                <th className="p-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-100 text-xs">
@@ -266,26 +295,39 @@ export default function CustomersTab({
                   <td colSpan={5} className="p-12 text-center text-zinc-400">
                     <Users size={32} className="mx-auto mb-2 opacity-30" />
                     <p className="font-bold text-sm text-zinc-700">No customers found</p>
-                    <p className="text-xs text-zinc-400 mt-0.5">Try searching with a different name, phone, or area</p>
+                    <p className="text-xs text-zinc-400 mt-0.5">Try searching with a different name, team, mobile, or area</p>
                   </td>
                 </tr>
               ) : (
                 filteredCustomers.map(cust => {
                   const cleanPhone = (cust.phone || '').replace(/\D/g, '').slice(-10);
-                  
+                  const cleanEmergency = (cust.emergencyPhone || '').replace(/\D/g, '').slice(-10);
+                  const particulars = cust.particulars || [];
+                  const daysList = (cust.availableDays || []).join(', ');
+
                   return (
                     <tr key={cust.id} className="hover:bg-zinc-50/60 transition-colors">
-                      {/* Name & Contact */}
+                      {/* Name, Contacts, Location & Team */}
                       <td className="p-4">
                         <div className="flex items-start gap-3">
-                          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-red-50 to-red-100 text-[#d33638] font-black text-sm flex items-center justify-center shrink-0 border border-red-200/60">
+                          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-red-50 to-red-100 text-[#d33638] font-black text-sm flex items-center justify-center shrink-0 border border-red-200/60">
                             {cust.name?.charAt(0)?.toUpperCase() || 'P'}
                           </div>
                           <div>
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1.5 flex-wrap">
                               <span className="font-extrabold text-zinc-900 text-sm leading-snug">
                                 {cust.name}
                               </span>
+                              {cust.age && (
+                                <span className="text-[10px] font-bold text-zinc-500 bg-zinc-100 px-1.5 py-0.2 rounded">
+                                  {cust.age}y
+                                </span>
+                              )}
+                              {cust.bloodGroup && (
+                                <span className="text-[10px] font-black text-red-700 bg-red-50 border border-red-200 px-1.5 py-0.2 rounded">
+                                  {cust.bloodGroup}
+                                </span>
+                              )}
                               {cust.membershipType === 'VIP' && (
                                 <span className="bg-amber-100 text-amber-800 text-[9px] font-black px-1.5 py-0.5 rounded flex items-center gap-0.5">
                                   <Star size={10} className="fill-amber-600 text-amber-600" /> VIP
@@ -293,15 +335,37 @@ export default function CustomersTab({
                               )}
                             </div>
 
-                            <div className="flex items-center gap-3 mt-1 text-[11px] font-medium text-zinc-500">
+                            {/* Team Name if exists */}
+                            {cust.teamName && (
+                              <div className="mt-0.5">
+                                <span className="inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-md bg-blue-50 text-blue-800 border border-blue-200">
+                                  <Users size={10} /> Team: {cust.teamName}
+                                </span>
+                                {cust.associatedMembers && (
+                                  <span className="text-[10px] text-zinc-400 font-medium ml-1.5">
+                                    ({cust.associatedMembers})
+                                  </span>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Contacts & Location */}
+                            <div className="flex items-center gap-3 mt-1 text-[11px] font-medium text-zinc-500 flex-wrap">
                               <button
                                 type="button"
                                 onClick={() => onViewCRM && onViewCRM(cust)}
                                 className="font-mono text-zinc-700 font-bold hover:text-[#d33638] flex items-center gap-1"
+                                title="Primary Contact 1"
                               >
-                                <Phone size={12} className="text-zinc-400" />
+                                <Phone size={11} className="text-zinc-400" />
                                 <span>+91 {cleanPhone}</span>
                               </button>
+
+                              {cleanEmergency && (
+                                <span className="font-mono text-zinc-400 text-[10px]" title="Emergency Contact 2">
+                                  Emg: +91 {cleanEmergency}
+                                </span>
+                              )}
 
                               {cust.area && (
                                 <span className="flex items-center gap-0.5 text-zinc-600 font-semibold bg-zinc-100 px-1.5 py-0.5 rounded">
@@ -310,71 +374,100 @@ export default function CustomersTab({
                               )}
                             </div>
 
-                            {cust.occupation && (
-                              <p className="text-[10px] text-zinc-400 font-medium mt-0.5 flex items-center gap-1">
-                                <Briefcase size={10} /> {cust.occupation}
+                            {cust.parentName && (
+                              <p className="text-[10px] text-zinc-400 font-medium mt-0.5">
+                                Parent: {cust.parentName}
                               </p>
                             )}
                           </div>
                         </div>
                       </td>
 
-                      {/* Preferences */}
+                      {/* Particulars & Schedule */}
                       <td className="p-4">
                         <div className="flex flex-col gap-1 items-start">
-                          <div className="flex items-center gap-1.5">
-                            {cust.preferredTime === 'Morning' && (
-                              <span className="bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-black px-2 py-0.5 rounded-lg flex items-center gap-1">
-                                <Sunrise size={11} /> Morning
+                          {/* Particulars badges */}
+                          <div className="flex flex-wrap gap-1">
+                            {particulars.includes('Court Booking') && (
+                              <span className="bg-blue-50 text-blue-800 border border-blue-200 text-[10px] font-black px-1.5 py-0.5 rounded">
+                                🏸 Court
                               </span>
                             )}
-                            {cust.preferredTime === 'Evening' && (
-                              <span className="bg-indigo-50 text-indigo-800 border border-indigo-200 text-[10px] font-black px-2 py-0.5 rounded-lg flex items-center gap-1">
-                                <Sunset size={11} /> Evening
+                            {particulars.includes('Group Game') && (
+                              <span className="bg-purple-50 text-purple-800 border border-purple-200 text-[10px] font-black px-1.5 py-0.5 rounded">
+                                👥 Group
                               </span>
                             )}
-                            {(cust.preferredTime === 'Both' || !cust.preferredTime) && (
-                              <span className="bg-zinc-100 text-zinc-700 text-[10px] font-bold px-2 py-0.5 rounded-lg">
-                                Flexible Time
+                            {particulars.includes('Karate') && (
+                              <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-black px-1.5 py-0.5 rounded">
+                                🥋 Karate
+                              </span>
+                            )}
+                            {particulars.length === 0 && (
+                              <span className="bg-zinc-100 text-zinc-600 text-[10px] font-bold px-1.5 py-0.5 rounded">
+                                Regular
                               </span>
                             )}
                           </div>
 
-                          <div className="text-[11px] font-bold text-zinc-500 mt-0.5">
-                            {cust.preferredService === 'Court Booking' && '🏸 Court Booking'}
-                            {cust.preferredService === 'Group Game' && '👥 Group Matches'}
-                            {(cust.preferredService === 'Both' || !cust.preferredService) && '⚡ Court & Group'}
+                          {/* Available Time & Days */}
+                          <div className="mt-1 text-[11px] font-bold text-zinc-700 flex items-center gap-1">
+                            <Clock size={11} className="text-zinc-400" />
+                            <span>{cust.availableTime || cust.preferredTime || 'Flexible'}</span>
                           </div>
+
+                          {daysList && (
+                            <span className="text-[10px] font-medium text-zinc-400">
+                              Days: {daysList}
+                            </span>
+                          )}
                         </div>
                       </td>
 
-                      {/* Hours & Wallet */}
+                      {/* Profession & Reference */}
+                      <td className="p-4">
+                        <div className="space-y-0.5">
+                          {cust.professionType && (
+                            <span className="inline-block text-[11px] font-black text-zinc-800 bg-zinc-100 px-2 py-0.5 rounded">
+                              💼 {cust.professionType}
+                            </span>
+                          )}
+
+                          {cust.workTime && (
+                            <p className="text-[10px] font-medium text-zinc-500">
+                              Time: {cust.workTime}
+                            </p>
+                          )}
+
+                          {cust.professionComments && (
+                            <p className="text-[10px] text-zinc-500 italic max-w-xs line-clamp-1" title={cust.professionComments}>
+                              {cust.professionComments}
+                            </p>
+                          )}
+
+                          {cust.referredBy && (
+                            <p className="text-[10px] font-semibold text-emerald-700 mt-1">
+                              Ref: {cust.referredBy}
+                            </p>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Hours & Spend */}
                       <td className="p-4">
                         <div>
                           <span className="font-extrabold text-zinc-900 block">
                             {cust.totalHours} hrs played
                           </span>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">
-                              ₹{cust.walletBalance || 0}
+                          <span className="font-black text-xs text-emerald-700 block mt-0.5">
+                            ₹{cust.totalSpend.toLocaleString()}
+                          </span>
+                          {(Number(cust.walletBalance) || 0) > 0 && (
+                            <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded bg-red-50 text-[#d33638] border border-red-200 mt-1 inline-block">
+                              Wallet: ₹{cust.walletBalance}
                             </span>
-                            {(Number(cust.passHours) || 0) > 0 && (
-                              <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-red-50 text-[#d33638] border border-red-200">
-                                {cust.passHours}h Pass
-                              </span>
-                            )}
-                          </div>
+                          )}
                         </div>
-                      </td>
-
-                      {/* Total Spend */}
-                      <td className="p-4">
-                        <span className="font-black text-sm text-zinc-900 block">
-                          ₹{cust.totalSpend.toLocaleString()}
-                        </span>
-                        <span className="text-[10px] text-zinc-400 font-medium">
-                          {cust.totalMatches} bookings
-                        </span>
                       </td>
 
                       {/* Actions */}

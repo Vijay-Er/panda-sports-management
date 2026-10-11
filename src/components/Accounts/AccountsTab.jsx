@@ -6,8 +6,6 @@ import {
   Clock, Sun, Moon, PieChart as PieIcon, LayoutGrid, BarChart2
 } from 'lucide-react';
 import { getLocalYYYYMMDD } from '../../utils/slots';
-import ShiftHandoverModal from './ShiftHandoverModal';
-import ShiftHandoversTable from './ShiftHandoversTable';
 import EODSummaryModal from './EODSummaryModal';
 import AccountCharts from './AccountCharts';
 
@@ -28,20 +26,16 @@ export default function AccountsTab({
   accounts,
   onOpenExpenseModal,
   onOpenSettleModal,
-  shiftHandovers = [],
+  activeShift,
   bookings = [],
   users = [],
-  currentUser,
-  onSaveHandover
+  currentUser
 }) {
   const today = new Date();
   const currentYear = today.getFullYear();
   const currentMonth = today.getMonth();
   const currentQuarter = Math.floor(currentMonth / 3);
 
-  // Sub-view State ('transactions' vs 'shifts')
-  const [activeAccountView, setActiveAccountView] = useState('transactions');
-  const [isShiftModalOpen, setIsShiftModalOpen] = useState(false);
   const [isEODModalOpen, setIsEODModalOpen] = useState(false);
   const [accountsDisplayMode, setAccountsDisplayMode] = useState('both'); // 'cards', 'charts', 'both'
 
@@ -207,16 +201,6 @@ export default function AccountsTab({
             <span>Record Expense</span>
           </button>
 
-          {/* Shift Handover */}
-          <button
-            onClick={() => setIsShiftModalOpen(true)}
-            className="bg-amber-500 hover:bg-amber-600 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 shadow-sm active:scale-95"
-            title="Perform Day/Evening cash drawer audit and staff handover"
-          >
-            <Clock size={15} />
-            <span>Handover Shift</span>
-          </button>
-
           {/* End-of-Day Director Report */}
           <button
             type="button"
@@ -238,59 +222,6 @@ export default function AccountsTab({
           </button>
         </div>
       </div>
-
-      {/* Subview Selector Tabs */}
-      <div className="flex gap-2 border-b border-zinc-200 pb-3 print:hidden">
-        <button
-          onClick={() => setActiveAccountView('transactions')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
-            activeAccountView === 'transactions'
-              ? 'bg-zinc-950 text-white shadow-sm'
-              : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
-          }`}
-        >
-          <FileSpreadsheet size={15} />
-          <span>Financial Ledger & Analytics</span>
-        </button>
-
-        <button
-          onClick={() => setActiveAccountView('shifts')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
-            activeAccountView === 'shifts'
-              ? 'bg-[#d33638] text-white shadow-sm'
-              : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
-          }`}
-        >
-          <Clock size={15} />
-          <span>Shift Handovers Audit ({shiftHandovers.length})</span>
-        </button>
-      </div>
-
-      {/* Official Print Header (Only visible when printing/saving PDF) */}
-      {activeAccountView === 'shifts' ? (
-        <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-amber-50/80 p-4 rounded-2xl border border-amber-200">
-            <div>
-              <h3 className="text-sm font-black text-amber-950 flex items-center gap-2">
-                <Clock size={16} className="text-amber-700" />
-                Staff Shift Handover & Cash Reconciliation History
-              </h3>
-              <p className="text-xs text-amber-700 mt-0.5">
-                Staff register accountability for Day Shift (6 AM - 2 PM) & Evening Shift (2 PM - 10 PM) with WhatsApp slip audit.
-              </p>
-            </div>
-            <button
-              onClick={() => setIsShiftModalOpen(true)}
-              className="bg-[#d33638] text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-[#b42628] transition-all shadow-sm active:scale-95 shrink-0 flex items-center gap-1.5"
-            >
-              <Clock size={14} />
-              <span>Record Shift Handover</span>
-            </button>
-          </div>
-          <ShiftHandoversTable handovers={shiftHandovers} />
-        </div>
-      ) : (
-        <>
           {/* Official Print Header (Only visible when printing/saving PDF) */}
       <div className="hidden print:block mb-6 border-b pb-4">
         <div className="flex justify-between items-center">
@@ -790,21 +721,6 @@ export default function AccountsTab({
           </table>
         </div>
       </div>
-    </>
-  )}
-
-      {/* Shift Handover Modal */}
-      <ShiftHandoverModal
-        isOpen={isShiftModalOpen}
-        onClose={() => setIsShiftModalOpen(false)}
-        currentCashBalance={accounts.cash}
-        users={users}
-        currentUser={currentUser}
-        onSaveHandover={(handover) => {
-          onSaveHandover(handover);
-          setIsShiftModalOpen(false);
-        }}
-      />
 
       {/* 10:00 PM End-of-Day Director Summary Modal */}
       <EODSummaryModal
@@ -812,7 +728,7 @@ export default function AccountsTab({
         onClose={() => setIsEODModalOpen(false)}
         transactions={transactions}
         bookings={bookings}
-        shiftHandovers={shiftHandovers}
+        activeShift={activeShift}
         currentUser={currentUser}
       />
     </div>

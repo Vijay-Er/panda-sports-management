@@ -19,7 +19,8 @@ export default function BookingModal({
   bookings,
   onAddBooking,
   customers = [],
-  prefilledCustomer = null
+  prefilledCustomer = null,
+  activeShift = null
 }) {
   const [bookingForm, setBookingForm] = useState({
     serviceType: initialServiceType,
@@ -988,6 +989,15 @@ export default function BookingModal({
               className="w-full bg-zinc-50 border border-zinc-300 rounded-xl px-3.5 py-2 focus:ring-2 focus:ring-black outline-none text-xs font-medium"
               placeholder="e.g. Paid via PhonePe, non-marking shoes issued..."
             />
+          </div>
+
+          {/* On-Duty Staff Attribution Note */}
+          <div className="flex items-center justify-between text-[11px] text-zinc-600 bg-zinc-100/80 px-3.5 py-2 rounded-xl border border-zinc-200">
+            <span className="font-semibold">Attributed To On-Duty Staff:</span>
+            <span className="font-extrabold text-zinc-900 flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              {activeShift?.staffName || 'Staff Member'} ({activeShift?.shiftType || 'Shift'})
+            </span>
           </div>
 
           <button

@@ -1,124 +1,220 @@
-import React, { useState } from 'react';
-import { CalendarDays, Users, Plus, Clock, Ban, MessageSquare, Banknote } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { 
+  CalendarDays, Users, Plus, Clock, Ban, MessageSquare, 
+  Banknote, Search, UserCheck, AlertCircle, CheckCircle2 
+} from 'lucide-react';
 import { openWhatsAppShare } from '../../utils/whatsapp';
+import { getLocalYYYYMMDD } from '../../utils/slots';
 import CollectBalanceModal from './CollectBalanceModal';
 
 export default function BookingsTab({ 
   onOpenBookingModal, 
-  bookings, 
+  bookings = [], 
   onCancelBooking,
   onCollectBalance,
   onSelectCustomer
 }) {
   const [selectedBookingForBalance, setSelectedBookingForBalance] = useState(null);
-  const activeBookings = bookings.filter(b => b.status === 'active');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'today', 'active', 'due'
+
+  const todayStr = getLocalYYYYMMDD();
+
+  // Filter bookings based on query and status filter
+  const filteredBookings = useMemo(() => {
+    return bookings.filter(b => {
+      const q = searchQuery.toLowerCase().trim();
+      const matchSearch = !q || 
+        b.customerName?.toLowerCase().includes(q) ||
+        b.customerPhone?.includes(q) ||
+        b.resourceName?.toLowerCase().includes(q) ||
+        b.createdBy?.toLowerCase().includes(q);
+
+      if (!matchSearch) return false;
+
+      if (statusFilter === 'today') return b.date === todayStr;
+      if (statusFilter === 'active') return b.status === 'active';
+      if (statusFilter === 'due') return (b.pendingBalance || 0) > 0;
+
+      return true;
+    });
+  }, [bookings, searchQuery, statusFilter, todayStr]);
+
+  const activeCount = bookings.filter(b => b.status === 'active').length;
+  const todayCount = bookings.filter(b => b.date === todayStr).length;
+  const pendingDueCount = bookings.filter(b => (b.pendingBalance || 0) > 0).length;
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-200">
+    <div className="space-y-6 animate-in fade-in duration-200">
       {/* Header & Quick Action Buttons */}
-      <div>
-        <h2 className="text-2xl font-extrabold text-zinc-900 tracking-tight">Court Reservations & Rentals</h2>
-        <p className="text-sm text-zinc-500 mt-1">
-          Schedule single court matches or split-payment group games with equipment & shoe rentals.
-        </p>
-      </div>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-5 rounded-3xl border border-zinc-200/80 shadow-sm">
+        <div>
+          <h2 className="text-2xl font-black text-zinc-900 tracking-tight flex items-center gap-2">
+            <CalendarDays className="text-[#d33638]" size={26} />
+            Court Reservations
+          </h2>
+          <p className="text-xs text-zinc-500 mt-0.5">
+            Create bookings, track counter equipment rentals, and view staff attribution
+          </p>
+        </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Court Booking Card */}
-        <div className="bg-white p-6 rounded-3xl shadow-sm border border-zinc-200 flex flex-col items-center text-center justify-between space-y-5 hover:border-panda-500 hover:shadow-md transition-all group">
-          <div className="w-16 h-16 bg-red-50 text-[#d33638] rounded-2xl flex items-center justify-center group-hover:bg-[#d33638] group-hover:text-white transition-all shadow-sm">
-            <CalendarDays size={32} />
-          </div>
-          <div>
-            <h3 className="font-extrabold text-lg text-zinc-900">Standard Court Reservation</h3>
-            <p className="text-xs text-zinc-500 mt-1 leading-relaxed max-w-sm">
-              Book Court 1 (Premium), 2, 3, or 4 with equipment add-ons (Paddles, Non-marking Shoes, Balls). Supports full or advance payments.
-            </p>
-          </div>
+        {/* Quick Action Buttons */}
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <button 
             onClick={() => onOpenBookingModal('court')} 
-            className="w-full bg-[#d33638] hover:bg-[#b42628] text-white py-3.5 rounded-xl font-extrabold text-sm transition-all flex items-center justify-center gap-2 shadow-md shadow-red-900/20 active:scale-[0.99]"
+            className="flex-1 sm:flex-initial bg-[#d33638] hover:bg-[#b42628] text-white py-2.5 px-4 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 shadow-sm shadow-red-900/20 active:scale-95"
           >
-            <Plus size={16} /> Book Court Slot
+            <Plus size={16} /> 
+            <span>+ Book Court Slot</span>
           </button>
-        </div>
 
-        {/* Group Game Card */}
-        <div className="bg-white p-6 rounded-3xl shadow-sm border border-zinc-200 flex flex-col items-center text-center justify-between space-y-5 hover:border-black hover:shadow-md transition-all group">
-          <div className="w-16 h-16 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center group-hover:bg-purple-600 group-hover:text-white transition-all shadow-sm">
-            <Users size={32} />
-          </div>
-          <div>
-            <h3 className="font-extrabold text-lg text-zinc-900">Group Match (Split Payment)</h3>
-            <p className="text-xs text-zinc-500 mt-1 leading-relaxed max-w-sm">
-              Split payment across multiple individual players. Each player can pay their share with Cash or UPI.
-            </p>
-          </div>
           <button 
             onClick={() => onOpenBookingModal('group')} 
-            className="w-full bg-purple-600 text-white py-3.5 rounded-xl font-bold text-sm hover:bg-purple-700 transition-all flex items-center justify-center gap-2 shadow-sm"
+            className="flex-1 sm:flex-initial bg-purple-600 hover:bg-purple-700 text-white py-2.5 px-4 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 shadow-sm active:scale-95"
           >
-            <Plus size={16} /> Book Group Game
+            <Users size={16} /> 
+            <span>+ Group Match (Split)</span>
           </button>
         </div>
       </div>
 
-      {/* Active Bookings Quick Overview */}
-      <div className="bg-white rounded-3xl border border-zinc-200 shadow-sm p-6 space-y-4">
-        <div className="flex justify-between items-center">
-          <div>
-            <h3 className="font-bold text-base text-zinc-900 flex items-center gap-2">
-              <Clock size={18} className="text-zinc-500" />
-              Active Bookings Right Now ({activeBookings.length})
-            </h3>
-            <p className="text-xs text-zinc-400">Court slots currently active or upcoming today</p>
-          </div>
+      {/* Filter and Search Bar */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-zinc-200 shadow-sm">
+        {/* Search */}
+        <div className="relative w-full sm:w-72">
+          <Search size={15} className="absolute left-3 top-2.5 text-zinc-400" />
+          <input
+            type="text"
+            placeholder="Search player, phone, court or staff..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-zinc-50 border border-zinc-200 rounded-xl pl-9 pr-3 py-2 text-xs font-semibold text-zinc-800 outline-none focus:ring-2 focus:ring-[#d33638]"
+          />
         </div>
 
-        {activeBookings.length === 0 ? (
-          <p className="text-sm text-zinc-400 italic text-center py-6">No active bookings scheduled.</p>
+        {/* Filter Pills */}
+        <div className="flex flex-wrap items-center gap-1.5 w-full sm:w-auto">
+          <button
+            onClick={() => setStatusFilter('all')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              statusFilter === 'all'
+                ? 'bg-zinc-900 text-white shadow-sm'
+                : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-600'
+            }`}
+          >
+            All ({bookings.length})
+          </button>
+
+          <button
+            onClick={() => setStatusFilter('today')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              statusFilter === 'today'
+                ? 'bg-[#d33638] text-white shadow-sm'
+                : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-600'
+            }`}
+          >
+            Today ({todayCount})
+          </button>
+
+          <button
+            onClick={() => setStatusFilter('active')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              statusFilter === 'active'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-600'
+            }`}
+          >
+            Active Right Now ({activeCount})
+          </button>
+
+          <button
+            onClick={() => setStatusFilter('due')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              statusFilter === 'due'
+                ? 'bg-amber-500 text-white shadow-sm'
+                : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-600'
+            }`}
+          >
+            Payment Due ({pendingDueCount})
+          </button>
+        </div>
+      </div>
+
+      {/* Bookings List */}
+      <div className="bg-white rounded-3xl border border-zinc-200 shadow-sm p-5 space-y-4">
+        {filteredBookings.length === 0 ? (
+          <div className="text-center py-12 text-zinc-400">
+            <CalendarDays size={36} className="mx-auto mb-2 text-zinc-300" />
+            <p className="text-xs font-bold">No bookings match the selected filter.</p>
+            <p className="text-[11px] text-zinc-400 mt-1">Try clearing your search query or switching filters.</p>
+          </div>
         ) : (
           <div className="divide-y divide-zinc-100">
-            {activeBookings.map(b => {
+            {filteredBookings.map(b => {
               const hasRentals = b.rentals && (b.rentals.paddles > 0 || b.rentals.shoes > 0 || b.rentals.balls > 0);
               const hasPending = (b.pendingBalance || 0) > 0;
+              const isToday = b.date === todayStr;
 
               return (
-                <div key={b.id} className="py-3.5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                  <div className="space-y-1">
+                <div key={b.id} className="py-4 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 hover:bg-zinc-50/50 -mx-3 px-3 rounded-2xl transition-colors">
+                  <div className="space-y-1.5 flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-extrabold text-sm text-zinc-900">{b.customerName}</span>
+                      <span className="font-black text-sm text-zinc-900">{b.customerName}</span>
+
                       {b.customerPhone && (
                         <button
                           type="button"
                           onClick={() => onSelectCustomer && onSelectCustomer({ name: b.customerName, phone: b.customerPhone })}
-                          className="text-xs text-blue-700 hover:text-blue-900 font-bold bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded-lg border border-blue-200 transition-colors flex items-center gap-1"
+                          className="text-[11px] text-blue-700 hover:text-blue-900 font-bold bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded-lg border border-blue-200 transition-colors flex items-center gap-1"
                           title="Click to view player match history & CRM profile"
                         >
-                          <span>📱 +91 {b.customerPhone}</span>
+                          <span>📱 {b.customerPhone}</span>
                         </button>
                       )}
-                      <span className="text-[10px] uppercase font-extrabold px-2 py-0.5 rounded bg-zinc-100 text-zinc-600">
+
+                      <span className={`text-[10px] uppercase font-black px-2 py-0.5 rounded-md ${
+                        b.resourceName?.includes('Premium') 
+                          ? 'bg-amber-100 text-amber-900 border border-amber-200' 
+                          : 'bg-zinc-100 text-zinc-700'
+                      }`}>
                         {b.resourceName}
                       </span>
-                      {b.gstEnabled && (
-                        <span 
-                          className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-blue-100 text-blue-800 border border-blue-200"
-                          title={`Academy GSTIN: 33AAECP4589K1Z4 | Billed to: ${b.companyName || 'Corporate'} (${b.companyGstin || 'Unregistered'})`}
-                        >
-                          🧾 18% GST ({b.companyName || 'Corporate'})
-                        </span>
-                      )}
+
+                      {/* Status badge */}
+                      <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md ${
+                        b.status === 'active' 
+                          ? 'bg-emerald-100 text-emerald-800' 
+                          : b.status === 'finished' 
+                          ? 'bg-zinc-100 text-zinc-600' 
+                          : 'bg-red-100 text-red-700'
+                      }`}>
+                        {b.status}
+                      </span>
+
                       {hasPending && (
-                        <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">
+                        <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-300 animate-pulse">
                           Due: ₹{b.pendingBalance}
                         </span>
                       )}
                     </div>
 
-                    <div className="text-xs text-zinc-500">
-                      Date: {b.date} • {b.startTime} - {b.endTime} ({b.duration} mins)
-                      {b.createdBy && <span className="ml-2 font-medium text-zinc-400">• Logged by {b.createdBy}</span>}
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500">
+                      <span className={`font-bold ${isToday ? 'text-[#d33638]' : 'text-zinc-700'}`}>
+                        {isToday ? 'Today' : b.date}
+                      </span>
+                      <span>•</span>
+                      <span className="font-bold text-zinc-800">{b.startTime} - {b.endTime}</span>
+                      <span>({b.duration} mins)</span>
+                      <span>•</span>
+                      <span className="font-extrabold text-zinc-900">₹{b.totalPrice || b.paidAmount || 0}</span>
+                      <span className="uppercase text-[10px] bg-zinc-100 px-1.5 py-0.2 rounded font-bold text-zinc-600">
+                        {b.paymentMode || 'cash'}
+                      </span>
+                      <span>•</span>
+                      <span className="font-semibold text-emerald-700 flex items-center gap-1">
+                        <UserCheck size={12} />
+                        Logged by: {b.createdBy || b.bookedBy || 'Staff'}
+                      </span>
                     </div>
 
                     {/* Rental items chips */}
@@ -148,12 +244,12 @@ export default function BookingsTab({
                   </div>
 
                   {/* Actions */}
-                  <div className="flex flex-wrap items-center gap-2 self-end sm:self-center">
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
                     {/* Collect Balance Button */}
                     {hasPending && (
                       <button
                         onClick={() => setSelectedBookingForBalance(b)}
-                        className="flex items-center gap-1 text-xs font-bold text-amber-800 bg-amber-100 hover:bg-amber-200 px-2.5 py-1.5 rounded-lg transition-colors border border-amber-300 shadow-sm"
+                        className="flex items-center gap-1 text-xs font-extrabold text-amber-900 bg-amber-100 hover:bg-amber-200 px-3 py-1.5 rounded-xl transition-all border border-amber-300 shadow-sm active:scale-95"
                         title="Collect remaining pending payment"
                       >
                         <Banknote size={14} />
@@ -164,21 +260,24 @@ export default function BookingsTab({
                     {/* WhatsApp Button */}
                     <button
                       onClick={() => openWhatsAppShare(b)}
-                      className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1.5 rounded-lg transition-colors shadow-sm"
+                      className="flex items-center gap-1.5 text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-3 py-1.5 rounded-xl transition-all shadow-sm active:scale-95"
                       title="Share digital booking receipt via WhatsApp"
                     >
-                      <MessageSquare size={14} className="text-emerald-600" />
-                      <span>WhatsApp Slip</span>
+                      <MessageSquare size={13} className="text-emerald-600" />
+                      <span>WhatsApp</span>
                     </button>
 
                     {/* Cancel Button */}
-                    <button 
-                      onClick={() => onCancelBooking(b.id)}
-                      className="flex items-center gap-1 text-xs font-semibold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2.5 py-1.5 rounded-lg transition-colors"
-                    >
-                      <Ban size={14} />
-                      <span>Cancel</span>
-                    </button>
+                    {b.status === 'active' && (
+                      <button 
+                        onClick={() => onCancelBooking(b.id)}
+                        className="flex items-center gap-1 text-xs font-bold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2.5 py-1.5 rounded-xl transition-all"
+                        title="Cancel reservation"
+                      >
+                        <Ban size={13} />
+                        <span>Cancel</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               );

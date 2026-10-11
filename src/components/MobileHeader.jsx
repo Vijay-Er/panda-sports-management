@@ -57,6 +57,7 @@ export default function MobileHeader({
         >
           <option value="dashboard">Dashboard</option>
           <option value="bookings">Bookings</option>
+          <option value="shifts">Shift Management</option>
           <option value="customers">Customers</option>
           <option value="classes">Classes & Batches</option>
           <option value="tournaments">Tournaments</option>

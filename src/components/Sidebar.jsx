@@ -1,7 +1,7 @@
 import React from 'react';
 import { 
   LayoutDashboard, CalendarDays, Users, Trophy, Coffee, Wallet, GraduationCap,
-  Volume2, VolumeX, DownloadCloud, ShieldCheck, LogOut, BellRing 
+  Volume2, VolumeX, DownloadCloud, ShieldCheck, LogOut, BellRing, UserCheck 
 } from 'lucide-react';
 import { exportAllDataJSON } from '../utils/storage';
 
@@ -19,14 +19,15 @@ export default function Sidebar({
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
-    { id: 'bookings', label: 'Manage Bookings', icon: <CalendarDays size={20} /> },
+    { id: 'bookings', label: 'Court Bookings', icon: <CalendarDays size={20} /> },
+    { id: 'shifts', label: 'Shift Management', icon: <UserCheck size={20} /> },
     { id: 'customers', label: 'Customer Directory', icon: <Users size={20} /> },
     { id: 'classes', label: 'Classes & Batches', icon: <GraduationCap size={20} /> },
     { id: 'tournaments', label: 'Tournaments & Cups', icon: <Trophy size={20} /> },
     { id: 'beverages', label: 'Beverages POS', icon: <Coffee size={20} /> },
     { id: 'accounts', label: 'Accounts Ledger', icon: <Wallet size={20} /> },
     ...(isSuperAdmin ? [
-      { id: 'admins', label: 'Admin Management', icon: <ShieldCheck size={20} /> }
+      { id: 'admins', label: 'Admin Directory', icon: <ShieldCheck size={20} /> }
     ] : [])
   ];
 

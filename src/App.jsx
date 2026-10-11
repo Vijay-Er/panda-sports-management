@@ -33,13 +33,16 @@ import ExpenseModal from './components/Accounts/ExpenseModal';
 import SettleModal from './components/Accounts/SettleModal';
 import AdminsTab from './components/Admins/AdminsTab';
 import TournamentsTab from './components/Tournaments/TournamentsTab';
+import ShiftsTab from './components/Shifts/ShiftsTab';
+import ShiftSwitchModal from './components/Shifts/ShiftSwitchModal';
+import TopDutyBar from './components/Header/TopDutyBar';
 
 import { 
   DEFAULT_ACADEMY_CATEGORIES,
   INITIAL_BATCHES, 
-  INITIAL_STUDENTS, 
-  INITIAL_SHIFT_HANDOVERS 
+  INITIAL_STUDENTS 
 } from './constants/classes';
+import { INITIAL_ACTIVE_SHIFT } from './constants/shifts';
 import { INITIAL_CUSTOMERS } from './constants/customers';
 import { INITIAL_TOURNAMENTS } from './constants/tournaments';
 
@@ -154,9 +157,11 @@ export default function App() {
   const [students, setStudents] = useState(() => 
     loadFromStorage('students', INITIAL_STUDENTS)
   );
-  const [shiftHandovers, setShiftHandovers] = useState(() => 
-    loadFromStorage('shift_handovers', INITIAL_SHIFT_HANDOVERS)
+  // Active On-Duty Shift Management State
+  const [activeShift, setActiveShift] = useState(() => 
+    loadFromStorage('active_shift', INITIAL_ACTIVE_SHIFT)
   );
+  const [isShiftSwitchModalOpen, setIsShiftSwitchModalOpen] = useState(false);
 
   // Centralized Customers State (Shared across Court Bookings, Group Matches & Academy Classes)
   const [customers, setCustomers] = useState(() => 
@@ -207,8 +212,8 @@ export default function App() {
   }, [students]);
 
   useEffect(() => {
-    saveToStorage('shift_handovers', shiftHandovers);
-  }, [shiftHandovers]);
+    saveToStorage('active_shift', activeShift);
+  }, [activeShift]);
 
   useEffect(() => {
     saveToStorage('customers', customers);
@@ -405,14 +410,17 @@ export default function App() {
   };
 
   const handleAddBooking = (newBooking, createdTransactions) => {
+    const onDutyStaff = activeShift?.staffName || currentUser?.name || 'Staff';
     const enrichedBooking = {
       ...newBooking,
-      createdBy: currentUser?.name || 'Staff'
+      createdBy: onDutyStaff,
+      bookedBy: onDutyStaff,
+      shiftType: activeShift?.shiftType || 'Morning Shift'
     };
 
     const enrichedTransactions = (createdTransactions || []).map(t => ({
       ...t,
-      createdBy: currentUser?.name || 'Staff'
+      createdBy: onDutyStaff
     }));
 
     if (enrichedTransactions.length > 0) {
@@ -504,7 +512,7 @@ export default function App() {
       category: 'Beverage',
       paymentMode: quickSellMode,
       description: `Sold 1x ${item.name}`,
-      createdBy: currentUser?.name || 'Staff',
+      createdBy: activeShift?.staffName || currentUser?.name || 'Staff',
       date: new Date().toISOString()
     };
     setTransactions(prev => [newTransaction, ...prev]);
@@ -841,15 +849,93 @@ export default function App() {
     showToast(`Logged coach payout of ₹${payoutData.amount} for ${payoutData.instructorName}!`);
   };
 
-  const handleSaveShiftHandover = (handoverRecord) => {
-    setShiftHandovers(prev => [handoverRecord, ...prev]);
-    showToast(`Recorded shift handover (${handoverRecord.shiftType === 'day' ? 'Day Shift' : 'Evening Shift'})!`);
+  // Shift Management Handlers
+  const handleSwitchShift = (newShiftData, syncTodayBookings = true) => {
+    setActiveShift(newShiftData);
+    saveToStorage('active_shift', newShiftData);
+    const todayStr = getLocalYYYYMMDD();
+    let syncedCount = 0;
+
+    if (syncTodayBookings) {
+      setBookings(prev => prev.map(b => {
+        if (b.date === todayStr) {
+          syncedCount++;
+          return {
+            ...b,
+            createdBy: newShiftData.staffName,
+            bookedBy: newShiftData.staffName,
+            shiftType: newShiftData.shiftType
+          };
+        }
+        return b;
+      }));
+
+      // Also attribute today's transactions to the staff
+      setTransactions(prev => prev.map(t => {
+        const tDate = t.date ? getLocalYYYYMMDD(t.date) : todayStr;
+        if (tDate === todayStr) {
+          return {
+            ...t,
+            createdBy: newShiftData.staffName
+          };
+        }
+        return t;
+      }));
+    }
+
+    showToast(
+      syncTodayBookings && syncedCount > 0
+        ? `On-Duty: ${newShiftData.staffName} (${newShiftData.shiftType}). All ${syncedCount} today bookings assigned to his name!`
+        : `On-Duty set to ${newShiftData.staffName} (${newShiftData.shiftType})!`
+    );
+  };
+
+  const handleSyncTodayBookingsToStaff = (staffName) => {
+    const todayStr = getLocalYYYYMMDD();
+    let count = 0;
+    setBookings(prev => prev.map(b => {
+      if (b.date === todayStr) {
+        count++;
+        return {
+          ...b,
+          createdBy: staffName,
+          bookedBy: staffName,
+          shiftType: activeShift?.shiftType || 'Morning Shift'
+        };
+      }
+      return b;
+    }));
+    setTransactions(prev => prev.map(t => {
+      const tDate = t.date ? getLocalYYYYMMDD(t.date) : todayStr;
+      if (tDate === todayStr) {
+        return {
+          ...t,
+          createdBy: staffName
+        };
+      }
+      return t;
+    }));
+    showToast(`Assigned all ${count} bookings for today to ${staffName}!`);
+  };
+
+  const handleReassignSingleBooking = (bookingId, newStaffName) => {
+    setBookings(prev => prev.map(b => {
+      if (b.id === bookingId) {
+        return {
+          ...b,
+          createdBy: newStaffName,
+          bookedBy: newStaffName
+        };
+      }
+      return b;
+    }));
+    showToast(`Booking assigned to ${newStaffName}!`);
   };
 
   const handleAddExpense = (expenseTransaction) => {
     const enrichedExpense = {
       ...expenseTransaction,
-      createdBy: currentUser?.name || 'Staff'
+      createdBy: activeShift?.staffName || currentUser?.name || 'Staff'
     };
     setTransactions(prev => [enrichedExpense, ...prev]);
     showToast(`Deducted ₹${expenseTransaction.amount} expense.`);
@@ -859,6 +945,7 @@ export default function App() {
     const booking = bookings.find(b => b.id === bookingId);
     if (!booking) return;
 
+    const onDutyStaff = activeShift?.staffName || currentUser?.name || 'Staff';
     const newPending = Math.max(0, (booking.pendingBalance || 0) - collectedAmount);
     setBookings(prev => prev.map(b => b.id === bookingId ? {
       ...b,
@@ -874,7 +961,7 @@ export default function App() {
       category: 'Court Booking',
       paymentMode,
       description: `Balance Cleared - ${booking.customerName} (${booking.resourceName})`,
-      createdBy: currentUser?.name || 'Staff',
+      createdBy: onDutyStaff,
       date: new Date().toISOString()
     };
     setTransactions(prev => [newTx, ...prev]);
@@ -960,7 +1047,7 @@ export default function App() {
         soundEnabled={soundEnabled}
         setSoundEnabled={handleToggleSound}
         onTestSound={handleTestSound}
-        allAppData={{ transactions, bookings, beverages, batches, students, shiftHandovers, academyCategories, customers, tournaments }}
+        allAppData={{ transactions, bookings, beverages, batches, students, activeShift, academyCategories, customers, tournaments }}
         currentUser={currentUser}
         onLogout={handleLogout}
       />
@@ -976,6 +1063,14 @@ export default function App() {
           onTestSound={handleTestSound}
           currentUser={currentUser}
           onLogout={handleLogout}
+        />
+
+        {/* Persistent Live Shift & On-Duty Header Bar */}
+        <TopDutyBar
+          activeShift={activeShift}
+          onOpenSwitchShiftModal={() => setIsShiftSwitchModalOpen(true)}
+          onOpenBookingModal={handleOpenBookingModal}
+          onOpenQuickBeverage={() => setActiveTab('beverages')}
         />
 
         {/* Dynamic Body Content */}
@@ -1004,6 +1099,18 @@ export default function App() {
                 onCancelBooking={handleCancelBooking}
                 onCollectBalance={handleCollectBalance}
                 onSelectCustomer={(cust) => setSelectedCustomerForCRM(cust)}
+              />
+            )}
+
+            {activeTab === 'shifts' && (
+              <ShiftsTab
+                activeShift={activeShift}
+                onOpenSwitchShiftModal={() => setIsShiftSwitchModalOpen(true)}
+                onSyncTodayBookingsToStaff={handleSyncTodayBookingsToStaff}
+                onReassignSingleBooking={handleReassignSingleBooking}
+                bookings={bookings}
+                transactions={transactions}
+                users={users}
               />
             )}
 
@@ -1071,10 +1178,9 @@ export default function App() {
                 bookings={bookings}
                 onOpenExpenseModal={() => setIsExpenseModalOpen(true)}
                 onOpenSettleModal={() => setIsSettleModalOpen(true)}
-                shiftHandovers={shiftHandovers}
+                activeShift={activeShift}
                 users={users}
                 currentUser={currentUser}
-                onSaveHandover={handleSaveShiftHandover}
               />
             )}
 
@@ -1103,6 +1209,7 @@ export default function App() {
         onAddBooking={handleAddBooking}
         customers={customers}
         prefilledCustomer={prefilledCustomerForBooking}
+        activeShift={activeShift}
       />
 
       <CustomerModal
@@ -1159,6 +1266,16 @@ export default function App() {
           }}
         />
       )}
+
+      {/* On-Duty Staff & Shift Switch Modal */}
+      <ShiftSwitchModal
+        isOpen={isShiftSwitchModalOpen}
+        onClose={() => setIsShiftSwitchModalOpen(false)}
+        activeShift={activeShift}
+        onSwitchShift={handleSwitchShift}
+        todayBookingsCount={bookings.filter(b => b.date === getLocalYYYYMMDD()).length}
+        users={users}
+      />
     </div>
   );
 }

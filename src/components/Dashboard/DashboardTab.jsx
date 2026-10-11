@@ -350,9 +350,12 @@ export default function DashboardTab({
                           )}
 
                           <div className="flex items-center justify-between gap-1.5 mt-2.5 pt-2 border-t border-zinc-200/50">
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1.5 flex-wrap">
                               <span className="text-[9px] font-extrabold text-zinc-500 uppercase bg-zinc-200/70 px-1.5 py-0.5 rounded">
                                 {b.serviceType}
+                              </span>
+                              <span className="text-[9px] text-zinc-600 font-bold bg-zinc-100 px-1.5 py-0.5 rounded border border-zinc-200/60" title="Booked by staff">
+                                👤 {b.createdBy || b.bookedBy || 'Staff'}
                               </span>
                               {(b.pendingBalance || 0) > 0 && (
                                 <button

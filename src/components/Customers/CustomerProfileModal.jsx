@@ -1,7 +1,8 @@
 import React, { useMemo } from 'react';
 import { 
   X, User, Phone, MessageSquare, Calendar, Award, Clock, 
-  MapPin, Briefcase, Star, Cake, ChevronRight, Plus, Sparkles
+  MapPin, Briefcase, Star, Cake, ChevronRight, Plus, Sparkles,
+  Users, FileText
 } from 'lucide-react';
 
 export default function CustomerProfileModal({
@@ -15,23 +16,36 @@ export default function CustomerProfileModal({
 
   const {
     name,
+    phoneRegionCode = '+91',
     phone,
-    email,
+    contact2RegionCode = '+91',
+    contact2,
+    emergencyPhone,
     area,
+    age,
+    gender,
+    particulars = [],
     preferredTime,
-    preferredService,
-    skillLevel,
-    occupation,
-    interests = [],
+    availableTime,
+    availableDays = [],
+    professionType,
+    workTime,
+    professionComments,
+    referredBy,
+    parentName,
+    teamName,
+    associatedMembers,
+    remarks,
+    comments,
+    notes,
     membershipType,
     dateOfBirth,
     walletBalance,
-    passHours,
-    notes,
-    createdAt
+    passHours
   } = customer;
 
   const cleanPhone = (phone || '').replace(/\D/g, '').slice(-10);
+  const cleanContact2 = (contact2 || emergencyPhone || '').replace(/\D/g, '').slice(-10);
   const cleanName = (name || '').trim().toLowerCase();
 
   // Match bookings accurately
@@ -70,6 +84,8 @@ export default function CustomerProfileModal({
     return diffDays >= -1 && diffDays <= 7;
   }, [dateOfBirth]);
 
+  const displayRemarks = remarks || comments || notes || '';
+
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
       <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
@@ -87,11 +103,18 @@ export default function CustomerProfileModal({
               )}
             </div>
             <h3 className="text-xl font-black text-white">{name}</h3>
-            <div className="flex items-center gap-3 text-xs text-zinc-300 font-semibold">
+            
+            {/* Contacts & Area */}
+            <div className="flex flex-wrap items-center gap-3 text-xs text-zinc-300 font-semibold mt-1">
               <span className="flex items-center gap-1">
                 <Phone size={13} className="text-emerald-400" />
-                +91 {cleanPhone}
+                {phoneRegionCode} {cleanPhone}
               </span>
+              {cleanContact2 && (
+                <span className="flex items-center gap-1 text-zinc-400 text-[11px]">
+                  Contact 2: {contact2RegionCode} {cleanContact2}
+                </span>
+              )}
               {area && (
                 <span className="flex items-center gap-1 text-zinc-400">
                   <MapPin size={13} className="text-[#d33638]" />
@@ -115,7 +138,7 @@ export default function CustomerProfileModal({
           <div className="flex items-center gap-2">
             {cleanPhone && (
               <a
-                href={`https://wa.me/91${cleanPhone}?text=Hello%20${encodeURIComponent(name)},%20greetings%20from%20Panda%20Sports%20Academy!%20🎾`}
+                href={`https://wa.me/${phoneRegionCode.replace(/\D/g, '')}${cleanPhone}?text=Hello%20${encodeURIComponent(name)},%20greetings%20from%20Panda%20Sports%20Academy!%20🎾`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="px-3.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5"
@@ -126,7 +149,7 @@ export default function CustomerProfileModal({
             )}
             {cleanPhone && (
               <a
-                href={`tel:+91${cleanPhone}`}
+                href={`tel:${phoneRegionCode}${cleanPhone}`}
                 className="px-3 py-1.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5"
               >
                 <Phone size={13} />
@@ -151,7 +174,7 @@ export default function CustomerProfileModal({
         </div>
 
         {/* Scrollable Body */}
-        <div className="p-6 space-y-5 overflow-y-auto">
+        <div className="p-6 space-y-4 overflow-y-auto text-xs">
           {/* Birthday Banner */}
           {isBirthdaySoon && (
             <div className="bg-amber-50 border border-amber-200 p-3.5 rounded-2xl flex items-center justify-between gap-3 animate-in fade-in">
@@ -166,7 +189,7 @@ export default function CustomerProfileModal({
               </div>
               {cleanPhone && (
                 <a
-                  href={`https://wa.me/91${cleanPhone}?text=Happy%20Birthday%20${encodeURIComponent(name)}!%20🎉%20Greetings%20from%20Panda%20Sports%20Academy!`}
+                  href={`https://wa.me/${phoneRegionCode.replace(/\D/g, '')}${cleanPhone}?text=Happy%20Birthday%20${encodeURIComponent(name)}!%20🎉%20Greetings%20from%20Panda%20Sports%20Academy!`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold"
@@ -197,77 +220,117 @@ export default function CustomerProfileModal({
             </div>
           </div>
 
-          {/* Player Preferences Summary */}
-          <div className="bg-zinc-50 p-4 rounded-2xl border border-zinc-200 space-y-2.5">
-            <h4 className="text-xs font-extrabold uppercase tracking-wider text-zinc-700 flex items-center gap-1.5">
-              <Sparkles size={14} className="text-[#d33638]" />
-              <span>Playing Preferences</span>
+          {/* Team & Teammates card if available */}
+          {(teamName || associatedMembers || parentName) && (
+            <div className="bg-blue-50/60 p-3.5 rounded-2xl border border-blue-200/80 space-y-1.5">
+              <h4 className="text-[11px] font-black uppercase tracking-wider text-blue-900 flex items-center gap-1.5">
+                <Users size={13} className="text-blue-700" />
+                <span>Team & Family Details</span>
+              </h4>
+              {teamName && (
+                <p className="font-extrabold text-blue-950">
+                  Team: <span className="underline">{teamName}</span>
+                </p>
+              )}
+              {associatedMembers && (
+                <p className="text-[11px] text-blue-800 font-semibold">
+                  Teammates: {associatedMembers}
+                </p>
+              )}
+              {parentName && (
+                <p className="text-[11px] text-zinc-600 font-medium">
+                  Parent / Guardian: {parentName}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Particulars & Routine */}
+          <div className="bg-zinc-50 p-3.5 rounded-2xl border border-zinc-200 space-y-2">
+            <h4 className="text-[11px] font-extrabold uppercase tracking-wider text-zinc-700 flex items-center gap-1.5">
+              <Calendar size={13} className="text-[#d33638]" />
+              <span>Particulars & Routine</span>
             </h4>
 
-            <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="grid grid-cols-2 gap-2">
               <div className="bg-white p-2.5 rounded-xl border border-zinc-200/80">
-                <span className="text-[10px] font-bold text-zinc-400 block uppercase">Timing</span>
+                <span className="text-[10px] font-bold text-zinc-400 block uppercase">Particulars</span>
                 <span className="font-black text-zinc-900">
-                  {preferredTime === 'Morning' && '🌅 Morning Slots'}
-                  {preferredTime === 'Evening' && '🌆 Evening Slots'}
-                  {(preferredTime === 'Both' || !preferredTime) && '🔄 Flexible Timing'}
+                  {(particulars || []).join(', ') || 'Court Booking'}
                 </span>
               </div>
 
               <div className="bg-white p-2.5 rounded-xl border border-zinc-200/80">
-                <span className="text-[10px] font-bold text-zinc-400 block uppercase">Play Style</span>
+                <span className="text-[10px] font-bold text-zinc-400 block uppercase">Available Time</span>
                 <span className="font-black text-zinc-900">
-                  {preferredService === 'Court Booking' && '🏸 Court Booking'}
-                  {preferredService === 'Group Game' && '👥 Group Matches'}
-                  {(preferredService === 'Both' || !preferredService) && '⚡ Court & Group'}
+                  {availableTime || preferredTime || 'Flexible'}
                 </span>
               </div>
 
-              {occupation && (
+              {availableDays && availableDays.length > 0 && (
                 <div className="bg-white p-2.5 rounded-xl border border-zinc-200/80 col-span-2">
-                  <span className="text-[10px] font-bold text-zinc-400 block uppercase">Occupation</span>
-                  <span className="font-black text-zinc-900">{occupation}</span>
-                </div>
-              )}
-
-              {interests && interests.length > 0 && (
-                <div className="bg-white p-2.5 rounded-xl border border-zinc-200/80 col-span-2">
-                  <span className="text-[10px] font-bold text-zinc-400 block uppercase mb-1">Interests</span>
-                  <div className="flex flex-wrap gap-1">
-                    {interests.map(i => (
-                      <span key={i} className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-red-50 text-[#d33638] border border-red-200">
-                        {i}
-                      </span>
-                    ))}
-                  </div>
+                  <span className="text-[10px] font-bold text-zinc-400 block uppercase">Available Days</span>
+                  <span className="font-bold text-zinc-800">
+                    {Array.isArray(availableDays) ? availableDays.join(', ') : availableDays}
+                  </span>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Favorite Court */}
-          <div className="bg-amber-50/60 p-3.5 rounded-2xl border border-amber-200/80 flex items-center justify-between text-xs">
-            <div className="flex items-center gap-2 text-amber-900 font-bold">
-              <Award size={18} className="text-amber-600" />
-              <span>Favorite Court:</span>
-              <span className="font-extrabold text-amber-950">{favoriteCourt}</span>
+          {/* Profession & Referral */}
+          {(professionType || workTime || professionComments || referredBy) && (
+            <div className="bg-zinc-50 p-3.5 rounded-2xl border border-zinc-200 space-y-2">
+              <h4 className="text-[11px] font-extrabold uppercase tracking-wider text-zinc-700 flex items-center gap-1.5">
+                <Briefcase size={13} className="text-[#d33638]" />
+                <span>Profession & Referral</span>
+              </h4>
+
+              <div className="bg-white p-2.5 rounded-xl border border-zinc-200/80 space-y-1">
+                {professionType && (
+                  <p className="font-black text-zinc-900">💼 {professionType}</p>
+                )}
+                {workTime && (
+                  <p className="text-[11px] text-zinc-600 font-medium">Work Time: {workTime}</p>
+                )}
+                {professionComments && (
+                  <p className="text-[11px] text-zinc-500 italic">{professionComments}</p>
+                )}
+                {referredBy && (
+                  <p className="text-[11px] font-bold text-emerald-700 pt-1 border-t border-zinc-100">
+                    Referred by: {referredBy}
+                  </p>
+                )}
+              </div>
             </div>
-            <span className="text-[10px] text-amber-700 font-bold">
+          )}
+
+          {/* Remarks Section */}
+          {displayRemarks && (
+            <div className="bg-amber-50/60 p-3.5 rounded-2xl border border-amber-200/80 space-y-1">
+              <h4 className="text-[10px] font-black uppercase tracking-wider text-amber-900 flex items-center gap-1">
+                <FileText size={12} className="text-amber-700" />
+                <span>Remarks & Special Notes</span>
+              </h4>
+              <p className="text-xs text-amber-950 font-medium leading-relaxed">{displayRemarks}</p>
+            </div>
+          )}
+
+          {/* Favorite Court */}
+          <div className="bg-zinc-50 p-3 rounded-2xl border border-zinc-200 flex items-center justify-between text-xs">
+            <div className="flex items-center gap-2 text-zinc-800 font-bold">
+              <Award size={16} className="text-amber-600" />
+              <span>Favorite Court:</span>
+              <span className="font-extrabold text-zinc-950">{favoriteCourt}</span>
+            </div>
+            <span className="text-[10px] text-zinc-500 font-bold">
               {courtCounts[favoriteCourt] || 0} bookings
             </span>
           </div>
 
-          {/* Notes */}
-          {notes && (
-            <div className="p-3 bg-zinc-50 rounded-xl border border-zinc-200 text-xs">
-              <span className="text-[10px] font-bold text-zinc-400 uppercase block mb-0.5">Admin Notes</span>
-              <p className="text-zinc-700 font-medium">{notes}</p>
-            </div>
-          )}
-
           {/* Recent Match History */}
           <div>
-            <h4 className="text-xs font-extrabold uppercase tracking-wider text-zinc-500 mb-2">
+            <h4 className="text-[11px] font-extrabold uppercase tracking-wider text-zinc-500 mb-2">
               Recent Matches ({playerBookings.length})
             </h4>
 
@@ -276,9 +339,9 @@ export default function CustomerProfileModal({
                 No past matches recorded yet.
               </p>
             ) : (
-              <div className="divide-y divide-zinc-100 border border-zinc-200 rounded-2xl overflow-hidden bg-white max-h-44 overflow-y-auto">
+              <div className="divide-y divide-zinc-100 border border-zinc-200 rounded-2xl overflow-hidden bg-white max-h-40 overflow-y-auto">
                 {playerBookings.slice(0, 5).map(b => (
-                  <div key={b.id} className="p-3 hover:bg-zinc-50 flex items-center justify-between text-xs">
+                  <div key={b.id} className="p-2.5 hover:bg-zinc-50 flex items-center justify-between text-xs">
                     <div>
                       <span className="font-black text-zinc-900 block">{b.resourceName || b.courtName}</span>
                       <span className="text-[10px] text-zinc-400 font-bold">{b.date} • {b.startTime} - {b.endTime}</span>

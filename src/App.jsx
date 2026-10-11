@@ -1112,6 +1112,7 @@ export default function App() {
           setCustomerToEdit(null);
         }}
         initialCustomer={customerToEdit}
+        customers={customers}
         onSaveCustomer={handleSaveCustomer}
       />
 

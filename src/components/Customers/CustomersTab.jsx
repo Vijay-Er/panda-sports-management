@@ -104,21 +104,20 @@ export default function CustomersTab({
   const eveningCount = enrichedCustomers.filter(c => (c.availableTime || c.preferredTime || '').toLowerCase().includes('evening') || c.preferredTime === 'Both').length;
   const totalSpendSum = enrichedCustomers.reduce((sum, c) => sum + (Number(c.totalSpend) || 0), 0);
 
-  // CSV Export including all handwritten fields
+  // CSV Export including all customized fields
   const handleExportCSV = () => {
     const headers = [
-      'Customer Name', 'Contact 1', 'Emergency Contact 2', 'Blood Group', 
+      'Customer Name', 'Contact 1', 'Contact 2', 
       'Location', 'Profession Type', 'Work Time', 'Profession Details', 
       'Referred By', 'Available Days', 'Available Time', 'Age', 'Gender', 
       'Particulars', 'Parents Name', 'Team / Group Name', 'Associated Members', 
-      'Comments', 'Total Hours', 'Total Spend'
+      'Remarks', 'Total Hours', 'Total Spend'
     ];
     
     const rows = filteredCustomers.map(c => [
       `"${c.name || ''}"`,
-      `"${c.phone || ''}"`,
-      `"${c.emergencyPhone || ''}"`,
-      `"${c.bloodGroup || ''}"`,
+      `"${(c.phoneRegionCode || '+91')} ${c.phone || ''}"`,
+      `"${c.contact2 ? `${c.contact2RegionCode || '+91'} ${c.contact2}` : ''}"`,
       `"${c.area || ''}"`,
       `"${c.professionType || ''}"`,
       `"${c.workTime || ''}"`,
@@ -132,7 +131,7 @@ export default function CustomersTab({
       `"${c.parentName || ''}"`,
       `"${c.teamName || ''}"`,
       `"${c.associatedMembers || ''}"`,
-      `"${c.comments || c.notes || ''}"`,
+      `"${c.remarks || c.comments || c.notes || ''}"`,
       `"${c.totalHours || 0}"`,
       `"${c.totalSpend || 0}"`
     ]);
@@ -323,11 +322,6 @@ export default function CustomersTab({
                                   {cust.age}y
                                 </span>
                               )}
-                              {cust.bloodGroup && (
-                                <span className="text-[10px] font-black text-red-700 bg-red-50 border border-red-200 px-1.5 py-0.2 rounded">
-                                  {cust.bloodGroup}
-                                </span>
-                              )}
                               {cust.membershipType === 'VIP' && (
                                 <span className="bg-amber-100 text-amber-800 text-[9px] font-black px-1.5 py-0.5 rounded flex items-center gap-0.5">
                                   <Star size={10} className="fill-amber-600 text-amber-600" /> VIP
@@ -358,12 +352,12 @@ export default function CustomersTab({
                                 title="Primary Contact 1"
                               >
                                 <Phone size={11} className="text-zinc-400" />
-                                <span>+91 {cleanPhone}</span>
+                                <span>{cust.phoneRegionCode || '+91'} {cleanPhone}</span>
                               </button>
 
-                              {cleanEmergency && (
-                                <span className="font-mono text-zinc-400 text-[10px]" title="Emergency Contact 2">
-                                  Emg: +91 {cleanEmergency}
+                              {(cust.contact2 || cust.emergencyPhone) && (
+                                <span className="font-mono text-zinc-500 text-[10px]" title="Contact 2">
+                                  Contact 2: {cust.contact2RegionCode || '+91'} {((cust.contact2 || cust.emergencyPhone || '').replace(/\D/g, '').slice(-10))}
                                 </span>
                               )}
 

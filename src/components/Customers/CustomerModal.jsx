@@ -1,27 +1,30 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, User, Phone, MapPin, Briefcase, Users, 
-  Calendar, CheckCircle2, Clock, Heart, Shield, FileText, Sparkles
+  Calendar, CheckCircle2, Clock, FileText, Plus, 
+  Search, ChevronDown, Check
 } from 'lucide-react';
 import { 
   GENDER_OPTIONS, 
-  BLOOD_GROUP_OPTIONS, 
   PARTICULARS_OPTIONS, 
   PROFESSION_TYPE_OPTIONS,
-  DAYS_OF_WEEK 
+  DAYS_OF_WEEK,
+  COUNTRY_DIAL_CODES
 } from '../../constants/customers';
 
 export default function CustomerModal({ 
   isOpen, 
   onClose, 
   onSaveCustomer, 
-  initialCustomer = null 
+  initialCustomer = null,
+  customers = []
 }) {
   const [formData, setFormData] = useState({
     name: '',
+    phoneRegionCode: '+91',
     phone: '',
-    emergencyPhone: '',
-    bloodGroup: '',
+    contact2RegionCode: '+91',
+    contact2: '',
     area: '',
     age: '',
     gender: 'Male',
@@ -35,20 +38,38 @@ export default function CustomerModal({
     referredBy: '',
     parentName: '',
     teamName: '',
-    associatedMembers: '',
-    comments: '',
+    associatedMembers: [],
+    remarks: '',
     membershipType: 'Regular',
     walletBalance: 0,
     passHours: 0
   });
 
+  // Autocomplete / Search States for Teammates & Referral
+  const [memberSearch, setMemberSearch] = useState('');
+  const [isMemberDropdownOpen, setIsMemberDropdownOpen] = useState(false);
+  const memberDropdownRef = useRef(null);
+
+  const [refSearch, setRefSearch] = useState('');
+  const [isRefDropdownOpen, setIsRefDropdownOpen] = useState(false);
+  const refDropdownRef = useRef(null);
+
   useEffect(() => {
     if (initialCustomer) {
+      // Parse associated members into an array of names
+      let membersArr = [];
+      if (Array.isArray(initialCustomer.associatedMembers)) {
+        membersArr = initialCustomer.associatedMembers;
+      } else if (typeof initialCustomer.associatedMembers === 'string' && initialCustomer.associatedMembers.trim()) {
+        membersArr = initialCustomer.associatedMembers.split(',').map(s => s.trim()).filter(Boolean);
+      }
+
       setFormData({
         name: initialCustomer.name || '',
+        phoneRegionCode: initialCustomer.phoneRegionCode || '+91',
         phone: (initialCustomer.phone || '').replace(/\D/g, '').slice(-10),
-        emergencyPhone: (initialCustomer.emergencyPhone || '').replace(/\D/g, '').slice(-10),
-        bloodGroup: initialCustomer.bloodGroup || '',
+        contact2RegionCode: initialCustomer.contact2RegionCode || '+91',
+        contact2: (initialCustomer.contact2 || initialCustomer.emergencyPhone || '').replace(/\D/g, '').slice(-10),
         area: initialCustomer.area || '',
         age: initialCustomer.age || '',
         gender: initialCustomer.gender || 'Male',
@@ -62,18 +83,20 @@ export default function CustomerModal({
         referredBy: initialCustomer.referredBy || '',
         parentName: initialCustomer.parentName || '',
         teamName: initialCustomer.teamName || '',
-        associatedMembers: initialCustomer.associatedMembers || '',
-        comments: initialCustomer.comments || initialCustomer.notes || '',
+        associatedMembers: membersArr,
+        remarks: initialCustomer.remarks || initialCustomer.comments || initialCustomer.notes || '',
         membershipType: initialCustomer.membershipType || 'Regular',
         walletBalance: initialCustomer.walletBalance || 0,
         passHours: initialCustomer.passHours || 0
       });
+      setRefSearch(initialCustomer.referredBy || '');
     } else {
       setFormData({
         name: '',
+        phoneRegionCode: '+91',
         phone: '',
-        emergencyPhone: '',
-        bloodGroup: '',
+        contact2RegionCode: '+91',
+        contact2: '',
         area: '',
         age: '',
         gender: 'Male',
@@ -87,14 +110,32 @@ export default function CustomerModal({
         referredBy: '',
         parentName: '',
         teamName: '',
-        associatedMembers: '',
-        comments: '',
+        associatedMembers: [],
+        remarks: '',
         membershipType: 'Regular',
         walletBalance: 0,
         passHours: 0
       });
+      setRefSearch('');
     }
+    setMemberSearch('');
+    setIsMemberDropdownOpen(false);
+    setIsRefDropdownOpen(false);
   }, [initialCustomer, isOpen]);
+
+  // Click outside listener for dropdowns
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (memberDropdownRef.current && !memberDropdownRef.current.contains(e.target)) {
+        setIsMemberDropdownOpen(false);
+      }
+      if (refDropdownRef.current && !refDropdownRef.current.contains(e.target)) {
+        setIsRefDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   if (!isOpen) return null;
 
@@ -142,6 +183,43 @@ export default function CustomerModal({
     if (preset === 'Weekends') setFormData(prev => ({ ...prev, availableDays: ['Sat', 'Sun'] }));
   };
 
+  // Associated Members / Teammates handlers
+  const addTeammate = (nameToAdd) => {
+    const trimmed = nameToAdd.trim();
+    if (!trimmed) return;
+    if (!formData.associatedMembers.includes(trimmed)) {
+      setFormData(prev => ({
+        ...prev,
+        associatedMembers: [...prev.associatedMembers, trimmed]
+      }));
+    }
+    setMemberSearch('');
+    setIsMemberDropdownOpen(false);
+  };
+
+  const removeTeammate = (nameToRemove) => {
+    setFormData(prev => ({
+      ...prev,
+      associatedMembers: prev.associatedMembers.filter(m => m !== nameToRemove)
+    }));
+  };
+
+  // Filtered existing customers for member search
+  const filteredExistingMembers = customers.filter(c => {
+    const nameMatch = c.name?.toLowerCase().includes(memberSearch.toLowerCase());
+    const phoneMatch = c.phone?.includes(memberSearch);
+    const notSelf = initialCustomer ? c.id !== initialCustomer.id : true;
+    const notAlreadyAdded = !formData.associatedMembers.includes(c.name);
+    return (nameMatch || phoneMatch) && notSelf && notAlreadyAdded;
+  });
+
+  // Filtered existing customers for referral search
+  const filteredReferralCustomers = customers.filter(c => {
+    const match = c.name?.toLowerCase().includes(refSearch.toLowerCase()) || c.phone?.includes(refSearch);
+    const notSelf = initialCustomer ? c.id !== initialCustomer.id : true;
+    return match && notSelf;
+  });
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!formData.name.trim()) {
@@ -158,9 +236,14 @@ export default function CustomerModal({
       ...formData,
       name: formData.name.trim(),
       phone: formData.phone.trim(),
+      contact2: formData.contact2.trim(),
+      emergencyPhone: formData.contact2.trim(), // backwards compatibility
+      associatedMembers: formData.associatedMembers.join(', '),
+      referredBy: refSearch.trim() || formData.referredBy,
+      notes: formData.remarks,
+      comments: formData.remarks,
       id: initialCustomer?.id || `cust-${formData.phone.trim()}`,
       preferredTime: formData.availableTime.toLowerCase().includes('morning') ? 'Morning' : (formData.availableTime.toLowerCase().includes('evening') ? 'Evening' : 'Both'),
-      notes: formData.comments,
       createdAt: initialCustomer?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       isActive: initialCustomer?.isActive !== undefined ? initialCustomer.isActive : true
@@ -184,7 +267,7 @@ export default function CustomerModal({
                 {initialCustomer ? 'Edit Customer Details' : 'Add Customer to Directory'}
               </h3>
               <p className="text-[11px] text-zinc-500 font-medium">
-                Complete player profile, schedule, profession & team details
+                Player contacts, schedule, profession, team & remarks
               </p>
             </div>
           </div>
@@ -199,11 +282,12 @@ export default function CustomerModal({
 
         {/* Scrollable Form Body */}
         <form onSubmit={handleSubmit} className="overflow-y-auto p-5 sm:p-6 space-y-5 text-xs">
-          {/* SECTION 1: CUSTOMER NAME & CONTACTS */}
+          
+          {/* SECTION 1: CUSTOMER NAME & CONTACTS (WITH REGION CODE) */}
           <div className="bg-zinc-50/70 p-4 rounded-2xl border border-zinc-200/80 space-y-3">
             <h4 className="text-[11px] font-black uppercase tracking-wider text-zinc-800 flex items-center gap-1.5">
               <User size={14} className="text-[#d33638]" />
-              <span>Customer Name & Contact Information</span>
+              <span>Customer Name & Contacts</span>
             </h4>
 
             <div>
@@ -223,12 +307,22 @@ export default function CustomerModal({
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Contact 1 with Country Region Code Selector */}
               <div>
                 <label className="block text-[10px] font-extrabold uppercase tracking-wider text-zinc-600 mb-1">
                   Contact 1 (Primary WhatsApp) <span className="text-[#d33638]">*</span>
                 </label>
-                <div className="relative flex items-center">
-                  <span className="absolute left-3 text-xs font-black text-zinc-400">+91</span>
+                <div className="flex items-center gap-1.5">
+                  <select
+                    value={formData.phoneRegionCode}
+                    onChange={(e) => setFormData(prev => ({ ...prev, phoneRegionCode: e.target.value }))}
+                    className="bg-white border border-zinc-200 focus:border-[#d33638] rounded-xl px-2 py-2 text-xs font-black text-zinc-800 outline-none w-24 shrink-0"
+                    title="Select country code"
+                  >
+                    {COUNTRY_DIAL_CODES.map(c => (
+                      <option key={c.code} value={c.code}>{c.label}</option>
+                    ))}
+                  </select>
                   <input
                     required
                     type="tel"
@@ -236,31 +330,41 @@ export default function CustomerModal({
                     maxLength={10}
                     value={formData.phone}
                     onChange={(e) => handlePhoneChange('phone', e)}
-                    className="w-full bg-white border border-zinc-200 focus:border-[#d33638] rounded-xl pl-11 pr-3 py-2 text-xs font-bold text-zinc-900 outline-none transition-all tracking-wider placeholder:text-zinc-400"
+                    className="flex-1 bg-white border border-zinc-200 focus:border-[#d33638] rounded-xl px-3 py-2 text-xs font-bold text-zinc-900 outline-none tracking-wider placeholder:text-zinc-400"
                   />
                 </div>
               </div>
 
+              {/* Contact 2 with Country Region Code Selector */}
               <div>
                 <label className="block text-[10px] font-extrabold uppercase tracking-wider text-zinc-600 mb-1">
-                  Emergency Contact 2
+                  Contact 2 (Secondary Number)
                 </label>
-                <div className="relative flex items-center">
-                  <span className="absolute left-3 text-xs font-black text-zinc-400">+91</span>
+                <div className="flex items-center gap-1.5">
+                  <select
+                    value={formData.contact2RegionCode}
+                    onChange={(e) => setFormData(prev => ({ ...prev, contact2RegionCode: e.target.value }))}
+                    className="bg-white border border-zinc-200 focus:border-[#d33638] rounded-xl px-2 py-2 text-xs font-black text-zinc-800 outline-none w-24 shrink-0"
+                    title="Select country code"
+                  >
+                    {COUNTRY_DIAL_CODES.map(c => (
+                      <option key={c.code} value={c.code}>{c.label}</option>
+                    ))}
+                  </select>
                   <input
                     type="tel"
                     placeholder="98409 98877"
                     maxLength={10}
-                    value={formData.emergencyPhone}
-                    onChange={(e) => handlePhoneChange('emergencyPhone', e)}
-                    className="w-full bg-white border border-zinc-200 focus:border-[#d33638] rounded-xl pl-11 pr-3 py-2 text-xs font-bold text-zinc-900 outline-none transition-all tracking-wider placeholder:text-zinc-400"
+                    value={formData.contact2}
+                    onChange={(e) => handlePhoneChange('contact2', e)}
+                    className="flex-1 bg-white border border-zinc-200 focus:border-[#d33638] rounded-xl px-3 py-2 text-xs font-bold text-zinc-900 outline-none tracking-wider placeholder:text-zinc-400"
                   />
                 </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-              <div className="col-span-2 sm:col-span-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <div className="col-span-2 sm:col-span-1">
                 <label className="block text-[10px] font-extrabold uppercase tracking-wider text-zinc-600 mb-1">
                   Location / Area
                 </label>
@@ -272,7 +376,7 @@ export default function CustomerModal({
                     placeholder="e.g. Anna Nagar, T. Nagar"
                     value={formData.area}
                     onChange={handleChange}
-                    className="w-full bg-white border border-zinc-200 focus:border-[#d33638] rounded-xl pl-8 pr-3 py-2 text-xs font-semibold text-zinc-900 outline-none transition-all placeholder:text-zinc-400"
+                    className="w-full bg-white border border-zinc-200 focus:border-[#d33638] rounded-xl pl-8 pr-3 py-2 text-xs font-semibold text-zinc-900 outline-none placeholder:text-zinc-400"
                   />
                 </div>
               </div>
@@ -295,61 +399,43 @@ export default function CustomerModal({
 
               <div>
                 <label className="block text-[10px] font-extrabold uppercase tracking-wider text-zinc-600 mb-1">
-                  Blood Group (Bgr)
+                  Gender
                 </label>
-                <select
-                  name="bloodGroup"
-                  value={formData.bloodGroup}
-                  onChange={handleChange}
-                  className="w-full bg-white border border-zinc-200 focus:border-[#d33638] rounded-xl px-2 py-2 text-xs font-bold text-zinc-900 outline-none"
-                >
-                  <option value="">Select</option>
-                  {BLOOD_GROUP_OPTIONS.map(b => (
-                    <option key={b} value={b}>{b}</option>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {['Male', 'Female'].map(g => (
+                    <button
+                      key={g}
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, gender: g }))}
+                      className={`py-1.5 rounded-xl font-bold border transition-all text-center ${
+                        formData.gender === g
+                          ? 'bg-zinc-900 text-white border-zinc-900'
+                          : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'
+                      }`}
+                    >
+                      {g}
+                    </button>
                   ))}
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-[10px] font-extrabold uppercase tracking-wider text-zinc-600 mb-1">
-                Gender
-              </label>
-              <div className="grid grid-cols-3 gap-2">
-                {GENDER_OPTIONS.map(g => (
-                  <button
-                    key={g}
-                    type="button"
-                    onClick={() => setFormData(prev => ({ ...prev, gender: g }))}
-                    className={`py-1.5 rounded-xl font-bold border transition-all text-center ${
-                      formData.gender === g
-                        ? 'bg-zinc-900 text-white border-zinc-900 shadow-sm'
-                        : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'
-                    }`}
-                  >
-                    {g}
-                  </button>
-                ))}
+                </div>
               </div>
             </div>
           </div>
 
-          {/* SECTION 2: PARTICULARS & SCHEDULE */}
+          {/* SECTION 2: PARTICULARS & SCHEDULE (NO BADMINTON) */}
           <div className="bg-zinc-50/70 p-4 rounded-2xl border border-zinc-200/80 space-y-3">
             <h4 className="text-[11px] font-black uppercase tracking-wider text-zinc-800 flex items-center gap-1.5">
               <Calendar size={14} className="text-[#d33638]" />
               <span>Particulars & Playing Routine</span>
             </h4>
 
-            {/* Particulars (Court, Group Game, Karate) */}
             <div>
               <label className="block text-[10px] font-extrabold uppercase tracking-wider text-zinc-600 mb-1.5">
                 Particulars (Select all that apply)
               </label>
               <div className="grid grid-cols-3 gap-2">
                 {[
-                  { id: 'Court Booking', label: '🏸 Court', sub: 'Badminton / Pickleball' },
-                  { id: 'Group Game', label: '👥 Group Game', sub: 'Open matches' },
+                  { id: 'Court Booking', label: '🏸 Court Booking', sub: 'Court slot booking' },
+                  { id: 'Group Game', label: '👥 Group Game', sub: 'Open matches & matches' },
                   { id: 'Karate', label: '🥋 Karate', sub: 'Academy batches' }
                 ].map(item => {
                   const isChecked = formData.particulars.includes(item.id);
@@ -456,7 +542,7 @@ export default function CustomerModal({
             </div>
           </div>
 
-          {/* SECTION 3: TEAM & ASSOCIATED MEMBERS */}
+          {/* SECTION 3: TEAM & ASSOCIATED MEMBERS (WITH SEARCH EXISTING CUSTOMERS) */}
           <div className="bg-zinc-50/70 p-4 rounded-2xl border border-zinc-200/80 space-y-3">
             <h4 className="text-[11px] font-black uppercase tracking-wider text-zinc-800 flex items-center gap-1.5">
               <Users size={14} className="text-[#d33638]" />
@@ -493,26 +579,94 @@ export default function CustomerModal({
               </div>
             </div>
 
-            <div>
+            {/* Associated Members with Live Search of Existing Customers */}
+            <div ref={memberDropdownRef} className="relative">
               <label className="block text-[10px] font-extrabold uppercase tracking-wider text-zinc-600 mb-1">
-                Associated Members / Teammates
+                Associated Members / Teammates (Search existing or type)
               </label>
-              <input
-                type="text"
-                name="associatedMembers"
-                placeholder="for example: Vignesh, Selva, Dinesh"
-                value={formData.associatedMembers}
-                onChange={handleChange}
-                className="w-full bg-white border border-zinc-200 focus:border-[#d33638] rounded-xl px-3 py-2 text-xs font-semibold text-zinc-900 outline-none placeholder:text-zinc-400"
-              />
+
+              {/* Tag chips for selected members */}
+              {formData.associatedMembers.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {formData.associatedMembers.map(member => (
+                    <span 
+                      key={member}
+                      className="inline-flex items-center gap-1 bg-red-50 text-[#d33638] border border-red-200 text-xs font-bold px-2.5 py-1 rounded-lg"
+                    >
+                      <span>{member}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeTeammate(member)}
+                        className="hover:text-red-900 p-0.5 rounded-full"
+                      >
+                        <X size={12} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* Search input with Add button */}
+              <div className="flex items-center gap-1.5">
+                <div className="relative flex-1">
+                  <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+                  <input
+                    type="text"
+                    placeholder="Search existing customer or type teammate name..."
+                    value={memberSearch}
+                    onFocus={() => setIsMemberDropdownOpen(true)}
+                    onChange={(e) => {
+                      setMemberSearch(e.target.value);
+                      setIsMemberDropdownOpen(true);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (memberSearch.trim()) addTeammate(memberSearch);
+                      }
+                    }}
+                    className="w-full bg-white border border-zinc-200 focus:border-[#d33638] rounded-xl pl-8 pr-3 py-2 text-xs font-semibold text-zinc-900 outline-none placeholder:text-zinc-400"
+                  />
+                </div>
+                {memberSearch.trim() && (
+                  <button
+                    type="button"
+                    onClick={() => addTeammate(memberSearch)}
+                    className="px-3 py-2 bg-zinc-900 hover:bg-black text-white rounded-xl text-xs font-bold shrink-0 transition-colors flex items-center gap-1"
+                  >
+                    <Plus size={13} />
+                    <span>Add</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Dropdown list of existing customers */}
+              {isMemberDropdownOpen && filteredExistingMembers.length > 0 && (
+                <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-zinc-200 rounded-2xl shadow-xl z-30 max-h-48 overflow-y-auto divide-y divide-zinc-50">
+                  <div className="px-3 py-1.5 bg-zinc-50 text-[10px] font-bold text-zinc-400 uppercase">
+                    Select from Registered Customers:
+                  </div>
+                  {filteredExistingMembers.map(cust => (
+                    <button
+                      key={cust.id}
+                      type="button"
+                      onClick={() => addTeammate(cust.name)}
+                      className="w-full px-3 py-2 text-left hover:bg-red-50/60 flex items-center justify-between text-xs transition-colors"
+                    >
+                      <span className="font-bold text-zinc-900">{cust.name}</span>
+                      <span className="text-[11px] font-mono text-zinc-400">+91 {cust.phone}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
-          {/* SECTION 4: PROFESSION, REFERENCE & COMMENTS */}
+          {/* SECTION 4: PROFESSION & REFERENCE (WITH SEARCH EXISTING CUSTOMERS) */}
           <div className="bg-zinc-50/70 p-4 rounded-2xl border border-zinc-200/80 space-y-3">
             <h4 className="text-[11px] font-black uppercase tracking-wider text-zinc-800 flex items-center gap-1.5">
               <Briefcase size={14} className="text-[#d33638]" />
-              <span>Profession, Reference & Miscellaneous Comments</span>
+              <span>Profession & Reference Details</span>
             </h4>
 
             {/* Working / Business Selector */}
@@ -554,22 +708,73 @@ export default function CustomerModal({
                 />
               </div>
 
-              <div>
+              {/* Reference (Who Referred?) with Live Search of Existing Customers */}
+              <div ref={refDropdownRef} className="relative">
                 <label className="block text-[10px] font-extrabold uppercase tracking-wider text-zinc-600 mb-1">
                   Reference (Who Referred?)
                 </label>
-                <input
-                  type="text"
-                  name="referredBy"
-                  placeholder="e.g. Vignesh / Friend / Walk-in"
-                  value={formData.referredBy}
-                  onChange={handleChange}
-                  className="w-full bg-white border border-zinc-200 focus:border-[#d33638] rounded-xl px-3 py-2 text-xs font-semibold text-zinc-900 outline-none placeholder:text-zinc-400"
-                />
+                <div className="relative">
+                  <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+                  <input
+                    type="text"
+                    placeholder="Search referring customer or type name / Walk-in..."
+                    value={refSearch}
+                    onFocus={() => setIsRefDropdownOpen(true)}
+                    onChange={(e) => {
+                      setRefSearch(e.target.value);
+                      setFormData(prev => ({ ...prev, referredBy: e.target.value }));
+                      setIsRefDropdownOpen(true);
+                    }}
+                    className="w-full bg-white border border-zinc-200 focus:border-[#d33638] rounded-xl pl-8 pr-3 py-2 text-xs font-semibold text-zinc-900 outline-none placeholder:text-zinc-400"
+                  />
+                </div>
+
+                {isRefDropdownOpen && (
+                  <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-zinc-200 rounded-2xl shadow-xl z-30 max-h-48 overflow-y-auto divide-y divide-zinc-50">
+                    <div className="px-3 py-1.5 bg-zinc-50 text-[10px] font-bold text-zinc-400 uppercase">
+                      Quick Select:
+                    </div>
+                    {['Walk-in', 'Friends & Family', 'Instagram / Social Media', 'Google Maps'].map(source => (
+                      <button
+                        key={source}
+                        type="button"
+                        onClick={() => {
+                          setRefSearch(source);
+                          setFormData(prev => ({ ...prev, referredBy: source }));
+                          setIsRefDropdownOpen(false);
+                        }}
+                        className="w-full px-3 py-1.5 text-left hover:bg-zinc-100 text-xs font-semibold text-zinc-700"
+                      >
+                        {source}
+                      </button>
+                    ))}
+                    {filteredReferralCustomers.length > 0 && (
+                      <div className="px-3 py-1.5 bg-zinc-50 text-[10px] font-bold text-zinc-400 uppercase">
+                        Or Existing Member:
+                      </div>
+                    )}
+                    {filteredReferralCustomers.map(cust => (
+                      <button
+                        key={cust.id}
+                        type="button"
+                        onClick={() => {
+                          const refVal = `${cust.name} (+91 ${cust.phone})`;
+                          setRefSearch(refVal);
+                          setFormData(prev => ({ ...prev, referredBy: refVal }));
+                          setIsRefDropdownOpen(false);
+                        }}
+                        className="w-full px-3 py-2 text-left hover:bg-red-50/60 flex items-center justify-between text-xs"
+                      >
+                        <span className="font-bold text-zinc-900">{cust.name}</span>
+                        <span className="text-[11px] font-mono text-zinc-400">+91 {cust.phone}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Profession Comments (e.g. hybrid base - 2 days to Bangalore / Medical equipments manufacturer) */}
+            {/* Profession Comments */}
             <div>
               <label className="block text-[10px] font-extrabold uppercase tracking-wider text-zinc-600 mb-1">
                 Profession Comments & Details
@@ -583,21 +788,25 @@ export default function CustomerModal({
                 className="w-full bg-white border border-zinc-200 focus:border-[#d33638] rounded-xl px-3 py-2 text-xs font-semibold text-zinc-900 outline-none placeholder:text-zinc-400"
               />
             </div>
+          </div>
 
-            {/* Comments (Miscellaneous details) */}
-            <div>
-              <label className="block text-[10px] font-extrabold uppercase tracking-wider text-zinc-600 mb-1">
-                Comments (Miscellaneous details)
-              </label>
-              <textarea
-                rows={2}
-                name="comments"
-                placeholder="Any special remarks, court preferences, box league participant, etc."
-                value={formData.comments}
-                onChange={handleChange}
-                className="w-full bg-white border border-zinc-200 focus:border-[#d33638] rounded-xl px-3 py-2 text-xs font-medium text-zinc-900 outline-none placeholder:text-zinc-400"
-              />
-            </div>
+          {/* SECTION 5: REMARKS & SPECIAL NOTES (SEPARATE DEDICATED SECTION) */}
+          <div className="bg-zinc-50/70 p-4 rounded-2xl border border-zinc-200/80 space-y-2">
+            <h4 className="text-[11px] font-black uppercase tracking-wider text-zinc-800 flex items-center gap-1.5">
+              <FileText size={14} className="text-[#d33638]" />
+              <span>Remarks & Special Notes</span>
+            </h4>
+            <p className="text-[10px] text-zinc-400 font-medium">
+              Miscellaneous observations, special requests, player history, or preferences
+            </p>
+            <textarea
+              rows={3}
+              name="remarks"
+              placeholder="e.g. Regular evening player, prefers Court 1, participates in weekend tournaments"
+              value={formData.remarks}
+              onChange={handleChange}
+              className="w-full bg-white border border-zinc-200 focus:border-[#d33638] rounded-xl px-3.5 py-2.5 text-xs font-medium text-zinc-900 outline-none transition-all placeholder:text-zinc-400"
+            />
           </div>
 
           {/* Submit Button */}

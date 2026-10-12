@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { 
   X, User, Phone, MessageSquare, Calendar, Award, Clock, 
   MapPin, Briefcase, Star, Cake, ChevronRight, Plus, Sparkles,
-  Users, FileText
+  Users, FileText, ExternalLink 
 } from 'lucide-react';
 
 export default function CustomerProfileModal({
@@ -10,7 +10,8 @@ export default function CustomerProfileModal({
   onClose,
   customer,
   bookings = [],
-  onBookForPlayer
+  onBookForPlayer,
+  onOpenFullDashboard
 }) {
   if (!isOpen || !customer) return null;
 
@@ -158,19 +159,36 @@ export default function CustomerProfileModal({
             )}
           </div>
 
-          {onBookForPlayer && (
-            <button
-              type="button"
-              onClick={() => {
-                onClose();
-                onBookForPlayer(customer);
-              }}
-              className="px-4 py-1.5 bg-[#d33638] hover:bg-[#b0292b] text-white rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm active:scale-95"
-            >
-              <Plus size={14} />
-              <span>Book Slot</span>
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {onOpenFullDashboard && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenFullDashboard(customer);
+                }}
+                className="px-3 py-1.5 bg-zinc-900 hover:bg-black text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1 shadow-sm active:scale-95"
+                title="Open full dedicated dashboard page"
+              >
+                <ExternalLink size={13} />
+                <span>Full Page</span>
+              </button>
+            )}
+
+            {onBookForPlayer && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onBookForPlayer(customer);
+                }}
+                className="px-4 py-1.5 bg-[#d33638] hover:bg-[#b0292b] text-white rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm active:scale-95"
+              >
+                <Plus size={14} />
+                <span>Book Slot</span>
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Scrollable Body */}

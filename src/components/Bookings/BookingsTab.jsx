@@ -1,20 +1,24 @@
 import React, { useState, useMemo } from 'react';
 import { 
   CalendarDays, Users, Plus, Clock, Ban, MessageSquare, 
-  Banknote, Search, UserCheck, AlertCircle, CheckCircle2 
+  Banknote, Search, UserCheck, AlertCircle, CheckCircle2, Coffee 
 } from 'lucide-react';
 import { openWhatsAppShare } from '../../utils/whatsapp';
 import { getLocalYYYYMMDD } from '../../utils/slots';
 import CollectBalanceModal from './CollectBalanceModal';
+import AddDrinksToBookingModal from './AddDrinksToBookingModal';
 
 export default function BookingsTab({ 
   onOpenBookingModal, 
   bookings = [], 
   onCancelBooking,
   onCollectBalance,
-  onSelectCustomer
+  onSelectCustomer,
+  beverages = [],
+  onAddDrinksToBooking
 }) {
   const [selectedBookingForBalance, setSelectedBookingForBalance] = useState(null);
+  const [selectedBookingForDrinks, setSelectedBookingForDrinks] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'today', 'active', 'due'
 
@@ -238,6 +242,21 @@ export default function BookingsTab({
                       </div>
                     )}
 
+                    {/* Merged Refreshments & Drinks Chips */}
+                    {b.drinks && b.drinks.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                        <span className="text-[10px] font-extrabold text-amber-900 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md flex items-center gap-1">
+                          <Coffee size={10} className="text-amber-700" />
+                          <span>Drinks:</span>
+                        </span>
+                        {b.drinks.map((d, i) => (
+                          <span key={i} className="text-[10px] font-bold bg-amber-100/70 text-amber-950 border border-amber-300 px-2 py-0.5 rounded-md">
+                            {d.icon || '🥤'} {d.quantity}x {d.name} (₹{d.subtotal || d.price * d.quantity})
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
                     {b.comments && (
                       <div className="text-[11px] text-zinc-400 italic">"{b.comments}"</div>
                     )}
@@ -245,6 +264,18 @@ export default function BookingsTab({
 
                   {/* Actions */}
                   <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    {/* Add Drinks to Active Booking */}
+                    {b.status === 'active' && onAddDrinksToBooking && (
+                      <button
+                        onClick={() => setSelectedBookingForDrinks(b)}
+                        className="flex items-center gap-1 text-xs font-bold text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-3 py-1.5 rounded-xl transition-all shadow-sm active:scale-95"
+                        title="Add drinks or snacks to this booking tab"
+                      >
+                        <Coffee size={13} className="text-amber-700" />
+                        <span>+ Drinks</span>
+                      </button>
+                    )}
+
                     {/* Collect Balance Button */}
                     {hasPending && (
                       <button
@@ -292,6 +323,15 @@ export default function BookingsTab({
         onClose={() => setSelectedBookingForBalance(null)}
         booking={selectedBookingForBalance}
         onCollectBalance={onCollectBalance}
+      />
+
+      {/* Add Drinks To Booking Modal */}
+      <AddDrinksToBookingModal
+        isOpen={!!selectedBookingForDrinks}
+        onClose={() => setSelectedBookingForDrinks(null)}
+        booking={selectedBookingForDrinks}
+        beverages={beverages}
+        onAddDrinks={onAddDrinksToBooking}
       />
     </div>
   );

@@ -4,21 +4,35 @@ import {
   DollarSign, Clock, Edit, Trash2, ExternalLink, Download, Sunrise, 
   Sunset, MapPin, Briefcase, Ticket, Wallet, Star, Shield, Heart
 } from 'lucide-react';
+import CustomerDashboardPage from './CustomerDashboardPage';
 
 export default function CustomersTab({
   customers = [],
   bookings = [],
   students = [],
+  transactions = [],
+  beverages = [],
   onOpenAddCustomer,
   onEditCustomer,
   onDeleteCustomer,
   onBookForCustomer,
   onEnrollCustomer,
   onOpenWalletTopup,
-  onViewCRM
+  onOpenAddDrinks,
+  onCollectBalance,
+  onViewCRM,
+  selectedCustomerForDashboard = null
 }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilter, setActiveFilter] = useState('All');
+  const [activeCustomerDashboard, setActiveCustomerDashboard] = useState(selectedCustomerForDashboard);
+
+  // Sync if selectedCustomerForDashboard prop updates
+  React.useEffect(() => {
+    if (selectedCustomerForDashboard) {
+      setActiveCustomerDashboard(selectedCustomerForDashboard);
+    }
+  }, [selectedCustomerForDashboard]);
 
   // Enrich customer records with real booking & academy metrics
   const enrichedCustomers = useMemo(() => {
@@ -145,6 +159,24 @@ export default function CustomersTab({
     link.click();
     document.body.removeChild(link);
   };
+
+  // If a customer is selected for their dedicated dashboard page, render CustomerDashboardPage!
+  if (activeCustomerDashboard) {
+    return (
+      <CustomerDashboardPage
+        customer={activeCustomerDashboard}
+        onBack={() => setActiveCustomerDashboard(null)}
+        bookings={bookings}
+        transactions={transactions}
+        beverages={beverages}
+        onBookForCustomer={onBookForCustomer}
+        onEditCustomer={onEditCustomer}
+        onOpenWalletTopup={onOpenWalletTopup}
+        onOpenAddDrinks={onOpenAddDrinks}
+        onCollectBalance={onCollectBalance}
+      />
+    );
+  }
 
   return (
     <div className="space-y-5 animate-in fade-in duration-150">
@@ -309,14 +341,24 @@ export default function CustomersTab({
                       {/* Name, Contacts, Location & Team */}
                       <td className="p-4">
                         <div className="flex items-start gap-3">
-                          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-red-50 to-red-100 text-[#d33638] font-black text-sm flex items-center justify-center shrink-0 border border-red-200/60">
+                          <button
+                            type="button"
+                            onClick={() => setActiveCustomerDashboard(cust)}
+                            className="w-10 h-10 rounded-2xl bg-gradient-to-br from-red-50 to-red-100 text-[#d33638] font-black text-sm flex items-center justify-center shrink-0 border border-red-200/60 hover:scale-105 transition-all shadow-sm"
+                            title="Open Customer Dashboard"
+                          >
                             {cust.name?.charAt(0)?.toUpperCase() || 'P'}
-                          </div>
+                          </button>
                           <div>
                             <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="font-extrabold text-zinc-900 text-sm leading-snug">
+                              <button
+                                type="button"
+                                onClick={() => setActiveCustomerDashboard(cust)}
+                                className="font-extrabold text-zinc-900 text-sm leading-snug hover:text-[#d33638] transition-colors text-left"
+                                title="Open Customer Dashboard"
+                              >
                                 {cust.name}
-                              </span>
+                              </button>
                               {cust.age && (
                                 <span className="text-[10px] font-bold text-zinc-500 bg-zinc-100 px-1.5 py-0.2 rounded">
                                   {cust.age}y
@@ -478,15 +520,18 @@ export default function CustomersTab({
                             <span>Book</span>
                           </button>
 
-                          {/* Profile CRM View */}
+                          {/* Dashboard / Profile View */}
                           <button
                             type="button"
-                            onClick={() => onViewCRM && onViewCRM(cust)}
-                            className="px-2.5 py-1.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 rounded-xl text-xs font-bold transition-colors flex items-center gap-1"
-                            title="Open full customer profile"
+                            onClick={() => {
+                              setActiveCustomerDashboard(cust);
+                              onViewCRM && onViewCRM(cust);
+                            }}
+                            className="px-2.5 py-1.5 bg-zinc-900 hover:bg-black text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1 shadow-sm active:scale-95"
+                            title="Open full customer dashboard page"
                           >
                             <ExternalLink size={13} />
-                            <span className="hidden sm:inline">Profile</span>
+                            <span>Dashboard</span>
                           </button>
 
                           {/* Direct WhatsApp Chat */}

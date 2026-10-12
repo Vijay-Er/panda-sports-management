@@ -428,6 +428,18 @@ export default function App() {
     }
     setBookings(prev => [enrichedBooking, ...prev]);
 
+    // Decrement stock for any drinks ordered on this booking
+    if (newBooking.drinks && Array.isArray(newBooking.drinks) && newBooking.drinks.length > 0) {
+      setBeverages(prev => prev.map(b => {
+        const ordered = newBooking.drinks.find(d => d.id.toString() === b.id.toString());
+        if (ordered) {
+          const curStock = typeof b.stock === 'number' ? b.stock : 20;
+          return { ...b, stock: Math.max(0, curStock - ordered.quantity) };
+        }
+        return b;
+      }));
+    }
+
     // AUTO-SAVE TO CUSTOMER DIRECTORY (PRIMARY USE CASE)
     // 1st booking immediately adds user to shared directory across all services
     const cleanPhone = (newBooking.customerPhone || '').replace(/\D/g, '').slice(-10);
@@ -498,25 +510,150 @@ export default function App() {
     }
   };
 
-  const handleSellBeverage = (item) => {
+  const handleAddDrinksToBooking = (bookingId, orderItems, paymentOption = 'add_to_bill', paymentMode = 'cash') => {
+    const onDutyStaff = activeShift?.staffName || currentUser?.name || 'Staff';
+    const addedAmount = orderItems.reduce((sum, item) => sum + (Number(item.subtotal) || (Number(item.price) * Number(item.quantity)) || 0), 0);
+
+    // 1. Decrement inventory stock
+    setBeverages(prev => prev.map(b => {
+      const found = orderItems.find(item => item.id.toString() === b.id.toString());
+      if (found) {
+        const curStock = typeof b.stock === 'number' ? b.stock : 20;
+        return { ...b, stock: Math.max(0, curStock - found.quantity) };
+      }
+      return b;
+    }));
+
+    let updatedTargetBooking = null;
+
+    // 2. Update booking
+    setBookings(prev => prev.map(b => {
+      if (b.id.toString() === bookingId.toString()) {
+        const existingDrinks = b.drinks && Array.isArray(b.drinks) ? [...b.drinks] : [];
+        orderItems.forEach(newItem => {
+          const idx = existingDrinks.findIndex(d => d.id.toString() === newItem.id.toString());
+          if (idx >= 0) {
+            existingDrinks[idx] = {
+              ...existingDrinks[idx],
+              quantity: (Number(existingDrinks[idx].quantity) || 0) + newItem.quantity,
+              subtotal: (Number(existingDrinks[idx].subtotal) || 0) + newItem.subtotal
+            };
+          } else {
+            existingDrinks.push(newItem);
+          }
+        });
+
+        const newTotalPrice = (Number(b.totalPrice) || 0) + addedAmount;
+        let newPaidAmount = Number(b.paidAmount) || 0;
+        let newPendingBalance = Number(b.pendingBalance) || 0;
+
+        if (paymentOption === 'pay_now') {
+          newPaidAmount += addedAmount;
+        } else {
+          newPendingBalance += addedAmount;
+        }
+
+        const updated = {
+          ...b,
+          drinks: existingDrinks,
+          drinksSubtotal: (Number(b.drinksSubtotal) || 0) + addedAmount,
+          totalPrice: newTotalPrice,
+          paidAmount: newPaidAmount,
+          pendingBalance: newPendingBalance
+        };
+        updatedTargetBooking = updated;
+        return updated;
+      }
+      return b;
+    }));
+
+    // 3. Log transaction if paid now
+    if (paymentOption === 'pay_now' && addedAmount > 0) {
+      const newTx = {
+        id: Date.now(),
+        type: 'income',
+        amount: addedAmount,
+        category: 'Beverage',
+        paymentMode: paymentMode,
+        description: `Refreshments for ${updatedTargetBooking?.customerName || 'Player'} (${updatedTargetBooking?.resourceName || 'Court'}): ${orderItems.map(d => `${d.quantity}x ${d.name}`).join(', ')}`,
+        bookingId: bookingId,
+        createdBy: onDutyStaff,
+        date: new Date().toISOString()
+      };
+      setTransactions(prev => [newTx, ...prev]);
+    }
+
+    // 4. Update customer's total spend and dues
+    if (updatedTargetBooking) {
+      const custCleanPhone = (updatedTargetBooking.customerPhone || '').replace(/\D/g, '').slice(-10);
+      const custCleanName = (updatedTargetBooking.customerName || '').trim().toLowerCase();
+
+      setCustomers(prev => prev.map(c => {
+        const cPhone = (c.phone || '').replace(/\D/g, '').slice(-10);
+        const cName = (c.name || '').trim().toLowerCase();
+        const matches = (custCleanPhone && cPhone === custCleanPhone) || (custCleanName && cName === custCleanName);
+        if (matches) {
+          return {
+            ...c,
+            totalSpend: (Number(c.totalSpend) || 0) + (paymentOption === 'pay_now' ? addedAmount : 0),
+            pendingDues: (Number(c.pendingDues) || 0) + (paymentOption === 'add_to_bill' ? addedAmount : 0)
+          };
+        }
+        return c;
+      }));
+    }
+
+    showToast(
+      paymentOption === 'add_to_bill'
+        ? `Added ₹${addedAmount} refreshments to court booking bill!`
+        : `Collected ₹${addedAmount} for refreshments (${paymentMode.toUpperCase()})!`
+    );
+  };
+
+  const handleSellBeverage = (item, customerData = null, paymentMode = null, bookingId = null) => {
+    const mode = paymentMode || quickSellMode;
+    const onDutyStaff = activeShift?.staffName || currentUser?.name || 'Staff';
+
+    // If an active booking was chosen, delegate to handleAddDrinksToBooking
+    if (bookingId) {
+      handleAddDrinksToBooking(bookingId, [{ ...item, quantity: 1, subtotal: item.price }], 'add_to_bill', mode);
+      return;
+    }
+
     // Decrement stock
     setBeverages(prev => prev.map(b => b.id === item.id ? {
       ...b,
       stock: Math.max(0, (typeof b.stock === 'number' ? b.stock : 20) - 1)
     } : b));
 
+    const customerNote = customerData ? ` - ${customerData.name}` : '';
     const newTransaction = {
       id: Date.now(),
       type: 'income',
       amount: item.price,
       category: 'Beverage',
-      paymentMode: quickSellMode,
-      description: `Sold 1x ${item.name}`,
-      createdBy: activeShift?.staffName || currentUser?.name || 'Staff',
+      paymentMode: mode,
+      description: `Sold 1x ${item.name}${customerNote}`,
+      createdBy: onDutyStaff,
+      customerId: customerData?.id,
       date: new Date().toISOString()
     };
     setTransactions(prev => [newTransaction, ...prev]);
-    showToast(`Sold 1x ${item.name} (${quickSellMode.toUpperCase()})`);
+
+    // Update customer spend if customer was specified
+    if (customerData) {
+      setCustomers(prev => prev.map(c => {
+        if (c.id === customerData.id) {
+          return {
+            ...c,
+            totalSpend: (Number(c.totalSpend) || 0) + Number(item.price)
+          };
+        }
+        return c;
+      }));
+    }
+
+    showToast(`Sold 1x ${item.name}${customerNote} (${mode.toUpperCase()})`);
   };
 
   const handleRestockBeverage = (beverageId, quantity) => {
@@ -692,6 +829,20 @@ export default function App() {
   const handleEnrollCustomer = (customer) => {
     setPrefilledCustomerForEnrollment(customer);
     setActiveTab('classes');
+  };
+
+  const handleSelectCustomerForCRM = (cust) => {
+    if (!cust) return;
+    const cleanPhone = (cust.phone || '').replace(/\D/g, '').slice(-10);
+    const cleanName = (cust.name || '').trim().toLowerCase();
+    const fullCustomer = customers.find(c => {
+      const cPhone = (c.phone || '').replace(/\D/g, '').slice(-10);
+      if (cleanPhone && cPhone) return cleanPhone === cPhone;
+      return c.name?.toLowerCase() === cleanName;
+    }) || cust;
+
+    setSelectedCustomerForCRM(fullCustomer);
+    setActiveTab('customers');
   };
 
   const handleTopupWallet = (customerId, { addedAmount, addedHours, transaction, packageTitle, chargeAmount }) => {
@@ -1088,7 +1239,7 @@ export default function App() {
                 currentTime={currentTime}
                 onCancelBooking={handleCancelBooking}
                 onCollectBalance={handleCollectBalance}
-                onSelectCustomer={(cust) => setSelectedCustomerForCRM(cust)}
+                onSelectCustomer={handleSelectCustomerForCRM}
               />
             )}
 
@@ -1098,7 +1249,9 @@ export default function App() {
                 onOpenBookingModal={handleOpenBookingModal}
                 onCancelBooking={handleCancelBooking}
                 onCollectBalance={handleCollectBalance}
-                onSelectCustomer={(cust) => setSelectedCustomerForCRM(cust)}
+                onSelectCustomer={handleSelectCustomerForCRM}
+                beverages={beverages}
+                onAddDrinksToBooking={handleAddDrinksToBooking}
               />
             )}
 
@@ -1119,6 +1272,8 @@ export default function App() {
                 customers={customers}
                 bookings={bookings}
                 students={students}
+                transactions={transactions}
+                beverages={beverages}
                 onOpenAddCustomer={handleOpenAddCustomer}
                 onEditCustomer={handleEditCustomer}
                 onDeleteCustomer={handleDeleteCustomer}
@@ -1128,7 +1283,10 @@ export default function App() {
                   setSelectedCustomerForWallet(cust);
                   setIsWalletModalOpen(true);
                 }}
+                onOpenAddDrinks={(b) => setActiveTab('bookings')}
+                onCollectBalance={handleCollectBalance}
                 onViewCRM={(cust) => setSelectedCustomerForCRM(cust)}
+                selectedCustomerForDashboard={selectedCustomerForCRM}
               />
             )}
 
@@ -1168,6 +1326,9 @@ export default function App() {
                 onOpenAddModal={() => setIsAddBeverageModalOpen(true)}
                 onDeleteBeverage={handleDeleteBeverage}
                 onRestockBeverage={handleRestockBeverage}
+                customers={customers}
+                bookings={bookings}
+                onAddDrinksToBooking={handleAddDrinksToBooking}
               />
             )}
 
@@ -1210,6 +1371,7 @@ export default function App() {
         customers={customers}
         prefilledCustomer={prefilledCustomerForBooking}
         activeShift={activeShift}
+        beverages={beverages}
       />
 
       <CustomerModal
@@ -1263,6 +1425,9 @@ export default function App() {
             const cust = selectedCustomerForCRM;
             setSelectedCustomerForCRM(null);
             handleBookForCustomer(cust);
+          }}
+          onOpenFullDashboard={(cust) => {
+            handleSelectCustomerForCRM(cust);
           }}
         />
       )}

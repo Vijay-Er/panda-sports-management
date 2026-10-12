@@ -19,6 +19,14 @@ export function formatWhatsAppMessage(booking) {
   const hasRentals = rentalLines.length > 0;
   const isPending = (booking.pendingBalance || 0) > 0;
 
+  const drinkLines = [];
+  if (booking.drinks && Array.isArray(booking.drinks) && booking.drinks.length > 0) {
+    booking.drinks.forEach(d => {
+      drinkLines.push(`   • ${d.icon || '🥤'} ${d.quantity}x ${d.name} (${Number(d.subtotal || d.price * d.quantity)} INR)`);
+    });
+  }
+  const hasDrinks = drinkLines.length > 0;
+
   const lines = [
     `🔴 *PANDA SPORTS ACADEMY — OFFICIAL BOOKING PASS* 🎾`,
     `━━━━━━━━━━━━━━━━━━━━━━`,
@@ -30,6 +38,10 @@ export function formatWhatsAppMessage(booking) {
     ...(hasRentals ? [
       `🏓 *Equipment & Shoe Rentals:*`,
       ...rentalLines
+    ] : []),
+    ...(hasDrinks ? [
+      `🥤 *Refreshments & Drinks:*`,
+      ...drinkLines
     ] : []),
     ...(booking.gstEnabled ? [
       `━━━━━━━━━━━━━━━━━━━━━━`,

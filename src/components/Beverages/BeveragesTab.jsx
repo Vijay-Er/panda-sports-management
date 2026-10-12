@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { Plus, Trash2, Banknote, Smartphone, UtensilsCrossed, Coffee, Tag, AlertCircle } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Plus, Trash2, Banknote, Smartphone, UtensilsCrossed, Coffee, Tag, AlertCircle, Users, CheckCircle2, X } from 'lucide-react';
+import { getLocalYYYYMMDD } from '../../utils/slots';
 
 export default function BeveragesTab({
   beverages,
@@ -8,9 +9,29 @@ export default function BeveragesTab({
   onSellBeverage,
   onOpenAddModal,
   onDeleteBeverage,
-  onRestockBeverage
+  onRestockBeverage,
+  customers = [],
+  bookings = [],
+  onAddDrinksToBooking
 }) {
   const [activeCategory, setActiveCategory] = useState('all');
+  const [selectedTargetType, setSelectedTargetType] = useState('walkin'); // 'walkin' | 'booking' | 'customer'
+  const [selectedBookingId, setSelectedBookingId] = useState('');
+  const [selectedCustomerId, setSelectedCustomerId] = useState('');
+  const [billingOption, setBillingOption] = useState('add_to_bill'); // 'add_to_bill' | 'pay_now'
+
+  const todayStr = getLocalYYYYMMDD();
+  const activeTodayBookings = useMemo(() => {
+    return bookings.filter(b => b.date === todayStr && b.status === 'active');
+  }, [bookings, todayStr]);
+
+  const activeBooking = useMemo(() => {
+    return bookings.find(b => b.id.toString() === selectedBookingId.toString());
+  }, [bookings, selectedBookingId]);
+
+  const activeCustomer = useMemo(() => {
+    return customers.find(c => c.id.toString() === selectedCustomerId.toString());
+  }, [customers, selectedCustomerId]);
 
   const filteredItems = beverages.filter(item => {
     if (activeCategory === 'all') return true;
@@ -110,6 +131,140 @@ export default function BeveragesTab({
             </button>
           </div>
         </div>
+      </div>
+
+      {/* Customer & Court Booking Linking Bar */}
+      <div className="bg-gradient-to-r from-zinc-900 to-zinc-950 text-white p-4 rounded-2xl shadow-md border border-zinc-800 space-y-3">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+          <div className="flex items-center gap-2">
+            <span className="w-8 h-8 rounded-xl bg-white/10 text-amber-400 flex items-center justify-center font-bold">
+              🥤
+            </span>
+            <div>
+              <h3 className="text-xs font-black uppercase tracking-wider text-zinc-200">
+                POS Billing Customer:
+              </h3>
+              <p className="text-[11px] text-zinc-400">
+                Merge drinks into player's court booking tab or assign to customer profile
+              </p>
+            </div>
+          </div>
+
+          {/* Mode Switcher */}
+          <div className="flex bg-white/10 p-1 rounded-xl text-xs font-bold">
+            <button
+              type="button"
+              onClick={() => { setSelectedTargetType('walkin'); setSelectedBookingId(''); setSelectedCustomerId(''); }}
+              className={`px-3 py-1 rounded-lg transition-all ${
+                selectedTargetType === 'walkin' ? 'bg-white text-zinc-900 shadow' : 'text-zinc-300 hover:text-white'
+              }`}
+            >
+              Walk-in Guest
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedTargetType('booking')}
+              className={`px-3 py-1 rounded-lg transition-all ${
+                selectedTargetType === 'booking' ? 'bg-[#d33638] text-white shadow' : 'text-zinc-300 hover:text-white'
+              }`}
+            >
+              Active Court Match ({activeTodayBookings.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedTargetType('customer')}
+              className={`px-3 py-1 rounded-lg transition-all ${
+                selectedTargetType === 'customer' ? 'bg-blue-600 text-white shadow' : 'text-zinc-300 hover:text-white'
+              }`}
+            >
+              Customer Directory
+            </button>
+          </div>
+        </div>
+
+        {/* Dropdown Pickers */}
+        {selectedTargetType === 'booking' && (
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-2 border-t border-white/10">
+            <div className="flex-1">
+              <label className="text-[10px] font-bold text-zinc-400 uppercase block mb-1">
+                Select Active Court Booking:
+              </label>
+              <select
+                value={selectedBookingId}
+                onChange={e => setSelectedBookingId(e.target.value)}
+                className="w-full bg-zinc-800 border border-zinc-700 text-white rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-[#d33638]"
+              >
+                <option value="">-- Choose Active Court Match --</option>
+                {activeTodayBookings.map(b => (
+                  <option key={b.id} value={b.id}>
+                    🏸 {b.customerName} • {b.resourceName} ({b.startTime} - {b.endTime})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {selectedBookingId && (
+              <div className="flex items-center gap-2 pt-2 sm:pt-4">
+                <span className="text-[10px] text-zinc-400 font-bold uppercase">Billing Mode:</span>
+                <button
+                  type="button"
+                  onClick={() => setBillingOption('add_to_bill')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                    billingOption === 'add_to_bill' ? 'bg-amber-400 text-zinc-950 font-black' : 'bg-zinc-800 text-zinc-300'
+                  }`}
+                >
+                  🧾 Add to Court Bill
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBillingOption('pay_now')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                    billingOption === 'pay_now' ? 'bg-emerald-400 text-zinc-950 font-black' : 'bg-zinc-800 text-zinc-300'
+                  }`}
+                >
+                  ⚡ Pay Now ({quickSellMode.toUpperCase()})
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {selectedTargetType === 'customer' && (
+          <div className="pt-2 border-t border-white/10">
+            <label className="text-[10px] font-bold text-zinc-400 uppercase block mb-1">
+              Select Customer from Directory:
+            </label>
+            <select
+              value={selectedCustomerId}
+              onChange={e => setSelectedCustomerId(e.target.value)}
+              className="w-full bg-zinc-800 border border-zinc-700 text-white rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-blue-500"
+            >
+              <option value="">-- Choose Customer --</option>
+              {customers.map(c => (
+                <option key={c.id} value={c.id}>
+                  👤 {c.name} {c.phone ? `(${c.phone})` : ''} • {c.area || 'Member'}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* Selected Confirmation Pill */}
+        {(activeBooking || activeCustomer) && (
+          <div className="bg-emerald-500/20 border border-emerald-500/40 px-3.5 py-2 rounded-xl text-xs flex items-center justify-between text-emerald-200">
+            <span className="font-bold">
+              ✅ Drinks sold below will be billed to: <strong className="text-white underline">{activeBooking ? `${activeBooking.customerName} (${activeBooking.resourceName})` : activeCustomer.name}</strong>
+              {activeBooking && billingOption === 'add_to_bill' && ' (Added to Court Tab)'}
+            </span>
+            <button
+              type="button"
+              onClick={() => { setSelectedTargetType('walkin'); setSelectedBookingId(''); setSelectedCustomerId(''); }}
+              className="text-zinc-400 hover:text-white text-xs font-bold flex items-center gap-1"
+            >
+              <X size={13} /> Clear
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Product Cards Grid */}
@@ -214,16 +369,39 @@ export default function BeveragesTab({
                   <button
                     type="button"
                     disabled={isOutOfStock}
-                    onClick={() => onSellBeverage(item)}
+                    onClick={() => {
+                      if (selectedTargetType === 'booking' && activeBooking && onAddDrinksToBooking) {
+                        onAddDrinksToBooking(
+                          activeBooking.id,
+                          [{ ...item, quantity: 1, subtotal: item.price }],
+                          billingOption,
+                          quickSellMode
+                        );
+                      } else if (selectedTargetType === 'customer' && activeCustomer) {
+                        onSellBeverage(item, activeCustomer, quickSellMode);
+                      } else {
+                        onSellBeverage(item);
+                      }
+                    }}
                     className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all active:scale-95 shadow-sm mt-2 flex items-center justify-center gap-1.5 ${
                       isOutOfStock
                         ? 'bg-zinc-200 text-zinc-400 cursor-not-allowed'
+                        : activeBooking && billingOption === 'add_to_bill'
+                        ? 'bg-amber-500 hover:bg-amber-600 text-zinc-950 font-black'
                         : quickSellMode === 'cash' 
                         ? 'bg-emerald-600 hover:bg-emerald-700 text-white' 
                         : 'bg-blue-600 hover:bg-blue-700 text-white'
                     }`}
                   >
-                    <span>{isOutOfStock ? 'Out of Stock' : `Sell 1x (${quickSellMode.toUpperCase()})`}</span>
+                    <span>
+                      {isOutOfStock 
+                        ? 'Out of Stock' 
+                        : activeBooking 
+                        ? (billingOption === 'add_to_bill' ? `+ Add to Tab (₹${item.price})` : `Bill Now (${quickSellMode.toUpperCase()} ₹${item.price})`)
+                        : activeCustomer
+                        ? `Bill ${activeCustomer.name.split(' ')[0]} (₹${item.price})`
+                        : `Sell 1x (${quickSellMode.toUpperCase()})`}
+                    </span>
                   </button>
                 );
               })()}

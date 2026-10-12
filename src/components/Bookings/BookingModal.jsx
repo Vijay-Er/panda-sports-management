@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { 
   X, CalendarDays, Users, Plus, Minus, Trash2, 
   Smartphone, Tag, Info, AlertCircle, Receipt, Search, Sparkles, UserCheck,
-  Clock, Check, CheckCircle2, Sun, Moon, LayoutGrid 
+  Clock, Check, CheckCircle2, Sun, Moon, LayoutGrid, Coffee, UtensilsCrossed 
 } from 'lucide-react';
 import { 
   generateTimeSlots, 
@@ -24,7 +24,8 @@ export default function BookingModal({
   onAddBooking,
   customers = [],
   prefilledCustomer = null,
-  activeShift = null
+  activeShift = null,
+  beverages = []
 }) {
   const [bookingForm, setBookingForm] = useState({
     serviceType: initialServiceType,
@@ -46,6 +47,9 @@ export default function BookingModal({
     shoeSizes: '',
     balls: 0
   });
+
+  // Drinks & Refreshments State (Merged with Court Booking)
+  const [selectedDrinks, setSelectedDrinks] = useState({}); // { [beverageId]: quantity }
 
   // 18% GST Invoice State (For Corporate / Business Clients)
   const [gstInvoiceEnabled, setGstInvoiceEnabled] = useState(false);
@@ -191,11 +195,19 @@ export default function BookingModal({
     return (rentals.paddles * 50) + (rentals.shoes * 50) + (rentals.balls * 250);
   }, [rentals]);
 
-  // Compute Base Subtotal
+  // Compute Drinks & Snacks Subtotal
+  const drinksSubtotal = useMemo(() => {
+    return Object.entries(selectedDrinks).reduce((sum, [id, qty]) => {
+      const item = beverages.find(b => b.id.toString() === id.toString());
+      return sum + (item ? ((Number(item.price) || 0) * qty) : 0);
+    }, 0);
+  }, [selectedDrinks, beverages]);
+
+  // Compute Base Subtotal (Court + Rentals + Refreshments)
   const baseSubtotal = useMemo(() => {
     const courtBase = parseFloat(bookingForm.courtPrice) || 0;
-    return courtBase + rentalsSubtotal;
-  }, [bookingForm.courtPrice, rentalsSubtotal]);
+    return courtBase + rentalsSubtotal + drinksSubtotal;
+  }, [bookingForm.courtPrice, rentalsSubtotal, drinksSubtotal]);
 
   // Compute GST (18%: 9% CGST + 9% SGST)
   const cgst = useMemo(() => gstInvoiceEnabled ? Math.round(baseSubtotal * 0.09) : 0, [gstInvoiceEnabled, baseSubtotal]);
@@ -334,6 +346,25 @@ export default function BookingModal({
         finalPendingBalance = 0;
       }
 
+      const drinksList = Object.entries(selectedDrinks)
+        .filter(([_, q]) => q > 0)
+        .map(([id, q]) => {
+          const item = beverages.find(b => b.id.toString() === id.toString());
+          return item ? {
+            id: item.id,
+            name: item.name,
+            price: Number(item.price) || 0,
+            quantity: q,
+            subtotal: (Number(item.price) || 0) * q,
+            icon: item.icon || '🥤'
+          } : null;
+        })
+        .filter(Boolean);
+
+      const drinksNote = drinksSubtotal > 0 
+        ? ` (+₹${drinksSubtotal} Refreshments: ${drinksList.map(d => `${d.quantity}x ${d.name}`).join(', ')})`
+        : '';
+
       if (finalCollectedAmount > 0) {
         const rentalNote = rentalsSubtotal > 0 
           ? ` (+₹${rentalsSubtotal} Rentals: ${rentals.paddles}p, ${rentals.shoes}s, ${rentals.balls}b)` 
@@ -346,11 +377,26 @@ export default function BookingModal({
           amount: finalCollectedAmount,
           category: gstInvoiceEnabled ? 'Court Booking (GST)' : 'Court Booking',
           paymentMode: bookingForm.paymentMode,
-          description: `${resource.name} - ${bookingForm.customerName.trim()} (${bookingForm.paymentStatus === 'advance' ? 'Advance ' : ''}${bookingForm.date})${rentalNote}${gstNote}`,
+          description: `${resource.name} - ${bookingForm.customerName.trim()} (${bookingForm.paymentStatus === 'advance' ? 'Advance ' : ''}${bookingForm.date})${rentalNote}${drinksNote}${gstNote}`,
           date: new Date().toISOString()
         });
       }
     }
+
+    const drinksList = Object.entries(selectedDrinks)
+      .filter(([_, q]) => q > 0)
+      .map(([id, q]) => {
+        const item = beverages.find(b => b.id.toString() === id.toString());
+        return item ? {
+          id: item.id,
+          name: item.name,
+          price: Number(item.price) || 0,
+          quantity: q,
+          subtotal: (Number(item.price) || 0) * q,
+          icon: item.icon || '🥤'
+        } : null;
+      })
+      .filter(Boolean);
 
     const newBooking = {
       id: Date.now(),
@@ -371,6 +417,9 @@ export default function BookingModal({
         balls: rentals.balls,
         subtotal: rentalsSubtotal
       },
+      // Refreshments & Drinks (Billed Together)
+      drinks: drinksList,
+      drinksSubtotal,
       // GST Invoice Details
       gstEnabled: gstInvoiceEnabled,
       gstRate: gstInvoiceEnabled ? 18 : 0,
@@ -948,6 +997,86 @@ export default function BookingModal({
             )}
           </div>
 
+          {/* REFRESHMENTS & DRINKS SECTION (BILLED TOGETHER WITH COURT) */}
+          <div className="bg-amber-50/50 p-4 rounded-2xl border border-amber-200/80 space-y-3">
+            <div className="flex justify-between items-center">
+              <span className="text-xs font-extrabold text-amber-950 uppercase tracking-wider flex items-center gap-1.5">
+                <Coffee size={15} className="text-amber-700" />
+                <span>Drinks & Refreshments (Billed With Court)</span>
+              </span>
+              {drinksSubtotal > 0 && (
+                <span className="text-xs font-black text-amber-900 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-full">
+                  +₹{drinksSubtotal}
+                </span>
+              )}
+            </div>
+
+            {beverages.length === 0 ? (
+              <p className="text-[11px] text-zinc-400 italic">No beverages in inventory.</p>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {beverages.map(item => {
+                  const qty = selectedDrinks[item.id] || 0;
+                  const stock = typeof item.stock === 'number' ? item.stock : 20;
+
+                  return (
+                    <div
+                      key={item.id}
+                      className={`p-2.5 rounded-xl border flex flex-col justify-between transition-all ${
+                        qty > 0 
+                          ? 'bg-white border-amber-400 shadow-sm ring-1 ring-amber-300' 
+                          : 'bg-white/80 border-zinc-200'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg select-none">{item.icon || '🥤'}</span>
+                        <div className="min-w-0">
+                          <p className="text-xs font-extrabold text-zinc-900 truncate">{item.name}</p>
+                          <p className="text-[10px] font-black text-emerald-700">₹{item.price}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-zinc-100">
+                        <button
+                          type="button"
+                          disabled={qty <= 0}
+                          onClick={() => {
+                            setSelectedDrinks(prev => {
+                              const next = (prev[item.id] || 0) - 1;
+                              if (next <= 0) {
+                                const copy = { ...prev };
+                                delete copy[item.id];
+                                return copy;
+                              }
+                              return { ...prev, [item.id]: next };
+                            });
+                          }}
+                          className="w-6 h-6 rounded-lg bg-zinc-100 hover:bg-zinc-200 disabled:opacity-30 flex items-center justify-center font-bold text-xs"
+                        >
+                          -
+                        </button>
+                        <span className="font-extrabold text-xs text-zinc-900">{qty}</span>
+                        <button
+                          type="button"
+                          disabled={stock <= 0 || qty >= stock}
+                          onClick={() => {
+                            setSelectedDrinks(prev => ({
+                              ...prev,
+                              [item.id]: (prev[item.id] || 0) + 1
+                            }));
+                          }}
+                          className="w-6 h-6 rounded-lg bg-zinc-900 text-white hover:bg-black disabled:opacity-30 flex items-center justify-center font-bold text-xs"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
           {/* 18% GST TAX INVOICE TOGGLE (For Corporate & Business Clients) */}
           <div className="bg-zinc-50 p-3.5 rounded-2xl border border-zinc-200 space-y-2.5">
             <div className="flex items-center justify-between">
@@ -1119,6 +1248,13 @@ export default function BookingModal({
                   <div className="flex justify-between items-center text-xs text-emerald-700 font-semibold">
                     <span>Rentals Subtotal:</span>
                     <span>+₹{rentalsSubtotal}</span>
+                  </div>
+                )}
+
+                {drinksSubtotal > 0 && (
+                  <div className="flex justify-between items-center text-xs text-amber-800 font-semibold">
+                    <span>Refreshments (Drinks & Snacks):</span>
+                    <span>+₹{drinksSubtotal}</span>
                   </div>
                 )}
 
